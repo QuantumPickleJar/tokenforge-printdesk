@@ -1,0 +1,62 @@
+.home-hero {
+  text-align: center;
+  padding-block: 4rem 3rem;
+}
+
+.home-hero__badge {
+  display: inline-flex;
+  margin-bottom: 1rem;
+}
+
+.home-hero__title {
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  font-weight: 800;
+  margin-bottom: 1rem;
+  letter-spacing: -0.02em;
+}
+
+.home-hero__subtitle {
+  font-size: 1.125rem;
+  color: var(--color-text-muted);
+  max-width: 600px;
+  margin-inline: auto;
+  margin-bottom: 2rem;
+  line-height: 1.7;
+}
+
+.home-hero__actions {
+  display: flex;
+  gap: 0.875rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.home-step-card {
+  text-align: center;
+}
+
+.home-step-card__number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: rgba(91, 141, 224, 0.15);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.home-feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.home-feature-list li {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+}
