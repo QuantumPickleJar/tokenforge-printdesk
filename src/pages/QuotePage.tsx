@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { acceptQuote, declineQuote, fetchQuoteByToken } from "../services/quoteService";
 import type { Quote } from "../types/quotes";
@@ -9,6 +9,7 @@ export function QuotePage() {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [acceptedNow, setAcceptedNow] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,9 +31,11 @@ export function QuotePage() {
     try {
       if (response === "accepted") {
         await acceptQuote(quote.id, token);
+        setAcceptedNow(true);
         setActionMsg("Quote accepted. Use the payment link below only if one was provided by the owner.");
       } else {
         await declineQuote(quote.id, token);
+        setAcceptedNow(false);
         setActionMsg("Quote declined. The owner has been notified.");
       }
     } catch (err) {
@@ -68,6 +71,7 @@ export function QuotePage() {
 
   const expiresDate = quote.expiresAt ? new Date(quote.expiresAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : null;
   const alreadyResponded = Boolean(quote.acceptedAt || quote.declinedAt || actionMsg);
+  const shouldShowPayment = Boolean(quote.paymentUrl && (quote.acceptedAt || acceptedNow));
 
   return (
     <QuoteShell>
@@ -101,10 +105,10 @@ export function QuotePage() {
         </div>
       )}
 
-      {quote.paymentUrl && (quote.acceptedAt || actionMsg) && (
+      {shouldShowPayment && (
         <div className="alert alert-info" style={{ marginTop: "1.5rem" }}>
           <span>🔗</span>
-          <div><strong>Payment link:</strong> <a href={quote.paymentUrl} target="_blank" rel="noreferrer">Open {quote.paymentProvider} payment page</a></div>
+          <div><strong>Payment link:</strong> <a href={quote.paymentUrl ?? "#"} target="_blank" rel="noreferrer">Open {quote.paymentProvider} payment page</a></div>
         </div>
       )}
 
@@ -116,6 +120,6 @@ export function QuotePage() {
   );
 }
 
-function QuoteShell({ children }: { children: React.ReactNode }) {
+function QuoteShell({ children }: { children: ReactNode }) {
   return <div className="container"><section className="section">{children}</section></div>;
 }
