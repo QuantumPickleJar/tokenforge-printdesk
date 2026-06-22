@@ -1,0 +1,86 @@
+.app-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: var(--nav-height);
+  background: rgba(15, 17, 23, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-nav__inner {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.app-nav__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  text-decoration: none;
+  color: var(--color-text);
+  font-weight: 700;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+
+.app-nav__brand:hover {
+  text-decoration: none;
+  color: var(--color-primary);
+}
+
+.app-nav__logo-mark {
+  font-size: 1.4rem;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.app-nav__brand-sub {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.app-nav__links {
+  display: flex;
+  list-style: none;
+  gap: 0.25rem;
+}
+
+.nav-link {
+  display: inline-block;
+  padding: 0.4rem 0.75rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.9rem;
+  border-radius: var(--radius);
+  transition: color var(--transition), background-color var(--transition);
+}
+
+.nav-link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  text-decoration: none;
+}
+
+.nav-link.active {
+  color: var(--color-primary);
+  background: rgba(91, 141, 224, 0.1);
+}
+
+.nav-link:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .app-nav__brand-name {
+    font-size: 0.875rem;
+  }
+  .nav-link {
+    padding: 0.4rem 0.5rem;
+    font-size: 0.8rem;
+  }
+}

@@ -1,0 +1,9 @@
+.owner-login-section {
+  max-width: 480px;
+}
+
+.owner-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

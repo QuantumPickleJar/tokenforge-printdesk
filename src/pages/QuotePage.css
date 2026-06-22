@@ -1,0 +1,45 @@
+.quote-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.quote-card {
+  max-width: 560px;
+}
+
+.quote-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.quote-table td {
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.9375rem;
+}
+
+.quote-table tr:first-child td {
+  border-top: none;
+}
+
+.quote-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+.quote-total-row td {
+  border-top: 2px solid var(--color-border);
+  padding-top: 0.75rem;
+}
+
+.quote-actions {
+  display: flex;
+  gap: 0.875rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
