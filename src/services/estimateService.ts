@@ -1,48 +1,43 @@
-import type { AdvancedPrintSettings } from "../types/printRequest";
+import type { MaterialVariant } from "../types/materials";
+import type { AdvancedPrintSettings, RoughMaterialEstimate } from "../types/printRequest";
+import type { StlAnalysisResult } from "./stlAnalyzer";
 
-// ─────────────────────────────────────────────
-// Estimate Service — scaffold stub
-// ─────────────────────────────────────────────
-// Provides rough, clearly-labelled material cost estimates for the
-// request form. These are NOT final prices. Final pricing is always
-// set by the owner after review.
-
-export interface RoughEstimateResult {
-  /** Estimated material weight in grams (very rough). */
-  estimatedWeightGrams: number;
-  /** Estimated material cost in USD (very rough). */
-  estimatedMaterialCost: number;
-  /** Human-readable disclaimer. */
-  disclaimer: string;
-  /** True when this is mock/scaffold data, not a real slicer estimate. */
-  isMock: boolean;
+export interface RoughEstimateResult extends RoughMaterialEstimate {
+  isApproximate: boolean;
 }
 
-/**
- * Returns a rough material cost estimate for display on the request form.
- * This is a MOCK estimate in the scaffold — it does not use a real slicer.
- *
- * TODO (implementation pass):
- *   - Route requests through the TokenForge processing worker for real estimates.
- *   - Worker will use PrusaSlicer CLI or equivalent with the selected profile.
- *   - Replace this stub with a call to processingJobService.createJob().
- */
-export async function estimateMaterialCost(
-  _materialCostPerGram: number,
-  _advancedSettings?: AdvancedPrintSettings
-): Promise<RoughEstimateResult> {
-  // Scaffold: return clearly fake estimate after brief delay.
-  await new Promise((r) => setTimeout(r, 400));
+export function estimateMaterialCost(
+  material: MaterialVariant,
+  analysis?: StlAnalysisResult,
+  advancedSettings?: AdvancedPrintSettings
+): RoughEstimateResult {
+  const generatedAt = new Date().toISOString();
+  const density = material.densityGcm3;
+  const costPerKg = material.costPerKg;
+  const volume = analysis?.estimatedVolumeCm3;
+  const infill = Math.max(0, Math.min(100, advancedSettings?.infillPercent ?? 15));
 
-  const mockWeightGrams = 28; // ~1 oz, typical small print
-  const mockCost = parseFloat((_materialCostPerGram * mockWeightGrams).toFixed(2));
+  const grams = volume
+    ? volume * density * approximateInfillMultiplier(infill)
+    : 25;
+
+  const cost = (grams / 1000) * costPerKg;
 
   return {
-    estimatedWeightGrams: mockWeightGrams,
-    estimatedMaterialCost: mockCost,
+    estimatedVolumeCm3: volume,
+    estimatedGrams: Number(grams.toFixed(1)),
+    estimatedMaterialCost: Number(cost.toFixed(2)),
+    selectedMaterialDensityGcm3: density,
+    selectedMaterialCostPerKg: costPerKg,
+    estimateVersion: "client-stl-volume-v0.1",
+    generatedAt,
+    isApproximate: true,
     disclaimer:
-      "⚠️ This is a rough scaffold estimate only — not a real slicer result. " +
-      "Final pricing is set by the owner after review.",
-    isMock: true,
+      "Rough material estimate only. Mesh volume and infill are approximated client-side; final pricing is set by the owner after review.",
   };
+}
+
+function approximateInfillMultiplier(infillPercent: number): number {
+  // This approximates slicer behavior without pretending to replace one: shells/top/bottom still use material even at low infill.
+  return 0.35 + (infillPercent / 100) * 0.65;
 }
