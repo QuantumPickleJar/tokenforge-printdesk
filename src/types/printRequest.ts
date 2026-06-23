@@ -95,6 +95,7 @@ export interface PrintRequest {
   description: string;
   materialColorId?: string | null;
   materialLabel?: string | null;
+  materialRequestNotes?: string | null;
   color?: string | null;
   sourceLink?: string | null;
   licensingConfirmed: boolean;
