@@ -127,11 +127,21 @@ function ModelSource({ req, openModel }: { req: PrintRequest; openModel: () => P
   }
 
   if (req.sourceLink) {
-    return (
-      <a className="btn btn-ghost btn-sm" href={req.sourceLink} target="_blank" rel="noopener noreferrer">
-        Open link
-      </a>
-    );
+    let isSafeLink = false;
+    try {
+      const { protocol } = new URL(req.sourceLink);
+      isSafeLink = protocol === "http:" || protocol === "https:";
+    } catch {
+      isSafeLink = false;
+    }
+    if (isSafeLink) {
+      return (
+        <a className="btn btn-ghost btn-sm" href={req.sourceLink} target="_blank" rel="noopener noreferrer">
+          Open link
+        </a>
+      );
+    }
+    return <span className="text-xs text-muted">Link unavailable</span>;
   }
 
   return <span className="text-muted">—</span>;
