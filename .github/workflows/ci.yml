@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - chore/request-flow-production-readiness
+
+jobs:
+  build:
+    name: Build, lint, and type-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build > build.log 2>&1
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Lint
+        run: npm run lint > lint.log 2>&1
+
+      - name: Upload lint log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-log
+          path: lint.log
+
+      - name: Type-check
+        run: npm run test
