@@ -4,6 +4,7 @@ import { HelpPopover } from "../components/common/HelpPopover";
 import { estimateMaterialCost, type RoughEstimateResult } from "../services/estimateService";
 import { fetchMaterialVariants } from "../services/materialService";
 import { submitRequest } from "../services/requestService";
+import { isSupabaseConfigured } from "../services/supabaseClient";
 import { analyzeStlFile, validateStlFile, type StlAnalysisResult } from "../services/stlAnalyzer";
 import type { MaterialVariant } from "../types/materials";
 import type { InfillType } from "../types/printRequest";
@@ -68,9 +69,12 @@ export function RequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | undefined>();
+  const supabaseReady = isSupabaseConfigured();
 
   useEffect(() => {
-    fetchMaterialVariants().then(setMaterials).catch((err) => setSubmitError(err instanceof Error ? err.message : "Could not load materials."));
+    fetchMaterialVariants()
+      .then(setMaterials)
+      .catch((err) => setSubmitError(err instanceof Error ? err.message : "Could not load materials."));
   }, []);
 
   const materialTypes = useMemo(() => Array.from(new Set(materials.map((m) => m.materialType))), [materials]);
@@ -132,12 +136,24 @@ export function RequestPage() {
     }
   }
 
+  function resetForm() {
+    setSubmitted(null);
+    setForm(DEFAULT_FORM);
+    setEstimate(null);
+    setStlFile(undefined);
+    setStlAnalysis(undefined);
+    setStlError(undefined);
+    setAdvancedMode(false);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setSubmitError(undefined);
     try {
+      if (!supabaseReady) throw new Error("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before accepting live requests.");
       if (!stlFile) throw new Error("Upload a valid .stl file before submitting.");
+      if (stlError) throw new Error(`Fix the STL upload before submitting: ${stlError}`);
       if (!form.licensingConfirmed) throw new Error("You must confirm licensing/source rights before submitting.");
       const result = await submitRequest({
         requesterName: form.name,
@@ -175,7 +191,7 @@ export function RequestPage() {
             </div>
           </div>
           <p className="text-muted">The owner will review your STL and request details before quoting. No payment is requested at submission time.</p>
-          <button className="btn btn-secondary" style={{ marginTop: "1rem" }} onClick={() => { setSubmitted(null); setForm(DEFAULT_FORM); setEstimate(null); setStlFile(undefined); }}>
+          <button className="btn btn-secondary" style={{ marginTop: "1rem" }} onClick={resetForm}>
             Submit another request
           </button>
         </section>
@@ -188,6 +204,13 @@ export function RequestPage() {
       <section className="section">
         <h1 className="section-title">Request a Quote</h1>
         <p className="section-subtitle">Upload an STL and describe the print. The owner reviews requests before accepting, quoting, or asking follow-up questions.</p>
+
+        {!supabaseReady && (
+          <div className="alert alert-warning" style={{ marginBottom: "1.5rem" }}>
+            <span>⚠️</span>
+            <span>Supabase is not configured yet. You can explore the form and STL preview, but live request submission is disabled until environment variables are set.</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="request-form" noValidate>
           <fieldset className="request-fieldset">
@@ -234,6 +257,9 @@ export function RequestPage() {
             <div className="form-group">
               <label className="form-label" htmlFor="req-stl">Upload STL file <span className="text-subtle">(.stl only, max 40 MB)</span></label>
               <input id="req-stl" name="stlFile" type="file" accept=".stl" className="form-input" onChange={handleStlChange} required />
+              <p className="form-hint">
+                Testing the flow? Use the included <a href={`${import.meta.env.BASE_URL}test-assets/smoke-cube.stl`} download>smoke-test cube STL</a>.
+              </p>
               {stlError && <p className="text-error text-sm" role="alert">{stlError}</p>}
               {stlAnalysis?.boundingBoxMm && <p className="form-hint">Bounds: {stlAnalysis.boundingBoxMm.x.toFixed(1)} × {stlAnalysis.boundingBoxMm.y.toFixed(1)} × {stlAnalysis.boundingBoxMm.z.toFixed(1)} mm</p>}
             </div>
@@ -261,7 +287,7 @@ export function RequestPage() {
           </fieldset>
 
           {submitError && <div className="alert alert-error" style={{ marginBottom: "1rem" }} role="alert"><span>⚠️</span><span>{submitError}</span></div>}
-          <div className="request-submit-row"><button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? "Submitting…" : "Submit Request"}</button><p className="text-xs text-muted" style={{ maxWidth: "460px" }}>The owner will review before quoting. Payment is not requested at submission time.</p></div>
+          <div className="request-submit-row"><button type="submit" className="btn btn-primary" disabled={submitting || !supabaseReady}>{submitting ? "Submitting…" : "Submit Request"}</button><p className="text-xs text-muted" style={{ maxWidth: "460px" }}>The owner will review before quoting. Payment is not requested at submission time.</p></div>
         </form>
       </section>
     </div>
