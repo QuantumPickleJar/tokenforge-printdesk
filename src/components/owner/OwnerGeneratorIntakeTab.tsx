@@ -72,14 +72,16 @@ export function OwnerGeneratorIntakeTab({ reload }: { reload: () => Promise<void
   function validate() {
     setSuccess(null);
     const result = parseTokenforgePrintRequestJson(jsonText);
-    if (!result.ok) {
+    if (result.ok === false) {
       setParsed(null);
       setError(result.error);
       return null;
     }
+
+    const payload = result.payload;
     setError(null);
-    setParsed(result.payload);
-    return result.payload;
+    setParsed(payload);
+    return payload;
   }
 
   async function addToQueue() {
