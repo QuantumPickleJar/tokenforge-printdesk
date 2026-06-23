@@ -36,7 +36,14 @@ jobs:
           path: build.log
 
       - name: Lint
-        run: npm run lint
+        run: npm run lint > lint.log 2>&1
+
+      - name: Upload lint log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-log
+          path: lint.log
 
       - name: Type-check
         run: npm run test
