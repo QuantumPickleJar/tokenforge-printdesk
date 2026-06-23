@@ -2,14 +2,14 @@
   position: sticky;
   top: 0;
   z-index: 50;
-  height: var(--nav-height);
+  min-height: var(--nav-height);
   background: rgba(15, 17, 23, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--color-border);
 }
 
 .app-nav__inner {
-  height: 100%;
+  min-height: var(--nav-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -25,6 +25,7 @@
   font-weight: 700;
   font-size: 1rem;
   white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 .app-nav__brand:hover {
@@ -43,10 +44,20 @@
   font-weight: 400;
 }
 
+.app-nav__nav {
+  min-width: 0;
+}
+
 .app-nav__links {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   list-style: none;
   gap: 0.25rem;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
 }
 
 .nav-link {
@@ -57,6 +68,7 @@
   font-size: 0.9rem;
   border-radius: var(--radius);
   transition: color var(--transition), background-color var(--transition);
+  white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -70,15 +82,48 @@
   background: rgba(91, 141, 224, 0.1);
 }
 
+.nav-link-owner {
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.nav-link-owner:hover {
+  border-color: var(--color-primary);
+}
+
 .nav-link:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .app-nav__inner {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .app-nav__nav,
+  .app-nav__links {
+    width: 100%;
+  }
+
+  .app-nav__links {
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 640px) {
   .app-nav__brand-name {
     font-size: 0.875rem;
   }
+
+  .app-nav__brand-sub {
+    display: none;
+  }
+
   .nav-link {
     padding: 0.4rem 0.5rem;
     font-size: 0.8rem;
