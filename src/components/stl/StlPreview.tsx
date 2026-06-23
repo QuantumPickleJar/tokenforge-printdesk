@@ -19,6 +19,7 @@ export function StlPreview({ file }: StlPreviewProps) {
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount || !file) return;
+    const previewFile = file;
 
     let disposed = false;
     let frame = 0;
@@ -45,7 +46,7 @@ export function StlPreview({ file }: StlPreviewProps) {
 
     async function load() {
       try {
-        const buffer = await file.arrayBuffer();
+        const buffer = await previewFile.arrayBuffer();
         if (disposed) return;
         const geometry = new STLLoader().parse(buffer);
         geometry.computeVertexNormals();
@@ -59,7 +60,7 @@ export function StlPreview({ file }: StlPreviewProps) {
         const size = new THREE.Vector3();
         box?.getSize(size);
         setBounds(box ? { x: size.x, y: size.y, z: size.z } : null);
-        setMessage(`Previewing ${file.name}`);
+        setMessage(`Previewing ${previewFile.name}`);
 
         const maxDim = Math.max(size.x || 1, size.y || 1, size.z || 1);
         camera.position.set(maxDim * 1.3, maxDim * 1.1, maxDim * 1.8);
