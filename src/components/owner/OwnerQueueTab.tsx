@@ -121,17 +121,29 @@ function QueueRow({ req, selected, toggle, reload }: { req: PrintRequest; select
   );
 }
 
+function isSafeUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function ModelSource({ req, openModel }: { req: PrintRequest; openModel: () => Promise<void> }) {
   if (req.modelAttached) {
     return <button className="btn btn-ghost btn-sm" onClick={openModel}>Open STL</button>;
   }
 
   if (req.sourceLink) {
-    return (
-      <a className="btn btn-ghost btn-sm" href={req.sourceLink} target="_blank" rel="noopener noreferrer">
-        Open link
-      </a>
-    );
+    if (isSafeUrl(req.sourceLink)) {
+      return (
+        <a className="btn btn-ghost btn-sm" href={req.sourceLink} target="_blank" rel="noopener noreferrer">
+          Open link
+        </a>
+      );
+    }
+    return <span className="text-muted text-xs">Invalid link format</span>;
   }
 
   return <span className="text-muted">—</span>;
