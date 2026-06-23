@@ -7,21 +7,28 @@ import "./QuotePage.css";
 export function QuotePage() {
   const { token } = useParams<{ token: string }>();
   const [quote, setQuote] = useState<Quote | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(token));
   const [working, setWorking] = useState(false);
   const [acceptedNow, setAcceptedNow] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
+    let cancelled = false;
     fetchQuoteByToken(token)
-      .then(setQuote)
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load quote."))
-      .finally(() => setLoading(false));
+      .then((loadedQuote) => {
+        if (!cancelled) setQuote(loadedQuote);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Could not load quote.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   async function respond(response: "accepted" | "declined") {
