@@ -26,7 +26,14 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build
+        run: npm run build > build.log 2>&1
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
 
       - name: Lint
         run: npm run lint
