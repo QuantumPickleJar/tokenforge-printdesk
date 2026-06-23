@@ -38,7 +38,6 @@ export function OwnerDashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function reload() {
-    setError(null);
     const [requestRows, materialRows, colorRows, galleryRows, groupRows, memberRows] = await Promise.all([
       fetchRequests(),
       fetchMaterials(),
@@ -47,6 +46,7 @@ export function OwnerDashboardPage() {
       fetchFamilyGroups(),
       fetchFamilyMembers(),
     ]);
+    setError(null);
     setRequests(requestRows);
     setMaterials(materialRows);
     setColors(colorRows);
@@ -56,9 +56,18 @@ export function OwnerDashboardPage() {
   }
 
   useEffect(() => {
-    reload()
-      .catch((err) => setError(err instanceof Error ? err.message : "Dashboard data could not be loaded."))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    void Promise.resolve()
+      .then(() => reload())
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Dashboard data could not be loaded.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
