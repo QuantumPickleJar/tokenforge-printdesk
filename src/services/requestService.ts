@@ -1,5 +1,7 @@
 import { requireSupabase } from "./supabaseClient";
 import { uploadStlFile } from "./storageService";
+import { isSafeHttpUrl } from "../types/tokenforgeHandoff";
+import type { PricingMode, TokenforgePrintRequestPayload } from "../types/tokenforgeHandoff";
 import type {
   InfillType,
   PaymentStatus,
@@ -32,6 +34,7 @@ interface RequestRow {
   received_at: string;
   status: RequestStatus;
   request_type: RequestType;
+  pricing_mode?: PricingMode | null;
   payment_required: boolean;
   payment_status: PaymentStatus;
   requester_name: string;
@@ -58,6 +61,7 @@ interface RequestRow {
   owner_notes: string | null;
   family_group_id: string | null;
   family_member_id: string | null;
+  tokenforge_payload?: TokenforgePrintRequestPayload | null;
   material_colors?: { color_name: string; materials?: { material_type: string; name: string } } | null;
   request_files?: RequestFileRow[];
   quotes?: { final_asking_price: number | null }[];
@@ -91,6 +95,7 @@ function mapRequest(row: RequestRow): PrintRequest {
     receivedAt: row.received_at,
     status: row.status,
     requestType: row.request_type,
+    pricingMode: row.pricing_mode ?? (row.request_type === "family_free" ? "family" : "quote"),
     paymentRequired: row.payment_required,
     paymentStatus: row.payment_status,
     requesterName: row.requester_name,
@@ -134,7 +139,54 @@ function mapRequest(row: RequestRow): PrintRequest {
     roughMaterialEstimate: row.rough_estimated_material_cost ?? undefined,
     ownerFinalPrice: row.quotes?.[0]?.final_asking_price ?? undefined,
     ownerNotes: row.owner_notes,
+    tokenforgePayload: row.tokenforge_payload ?? null,
   };
+}
+
+function firstSafeUrl(...values: string[]): string {
+  return values.find((value) => isSafeHttpUrl(value)) ?? "";
+}
+
+function minutesToReadable(minutes: number | null): string {
+  if (minutes == null) return "TBD";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours > 0 ? `${hours}h ${remainder}m` : `${remainder}m`;
+}
+
+function buildTokenforgeDescription(payload: TokenforgePrintRequestPayload): string {
+  const lines = [
+    payload.item.description,
+    "",
+    "Tokenforge Generator handoff:",
+    `Project: ${payload.source.projectName || "TBD"}`,
+    `Generator: ${payload.source.generatorVersion || "TBD"}`,
+    `Category: ${payload.print.category || "TBD"}`,
+    `Quantity: ${payload.print.requestedQuantity}`,
+    `Material: ${payload.print.material || "TBD"}`,
+    `Colors: ${payload.print.colors.join(", ") || "TBD"}`,
+    `Nozzle: ${payload.print.nozzleMm ?? "TBD"} mm`,
+    `Layer height: ${payload.print.layerHeightMm ?? "TBD"} mm`,
+    `Estimate: ${payload.print.estimatedGrams ?? "TBD"} g / ${minutesToReadable(payload.print.estimatedTimeMinutes)}`,
+    payload.customer.notes ? `Customer notes: ${payload.customer.notes}` : "",
+    payload.print.notes ? `Print notes: ${payload.print.notes}` : "",
+  ];
+
+  return lines.filter((line) => line !== "").join("\n");
+}
+
+function buildTokenforgeMaterialNotes(payload: TokenforgePrintRequestPayload): string {
+  return [
+    `Pricing mode: ${payload.pricingMode}`,
+    payload.item.galleryUrl ? `Gallery URL: ${payload.item.galleryUrl}` : "",
+    payload.item.imageUrl ? `Image URL: ${payload.item.imageUrl}` : "",
+    payload.item.modelUrl ? `Model URL: ${payload.item.modelUrl}` : "",
+    payload.item.previewUrl ? `Preview URL: ${payload.item.previewUrl}` : "",
+    payload.attachments.packagePath ? `Package path: ${payload.attachments.packagePath}` : "",
+    payload.attachments.stlPath ? `STL path: ${payload.attachments.stlPath}` : "",
+    payload.attachments.previewPath ? `Preview path: ${payload.attachments.previewPath}` : "",
+    payload.attachments.metadataPath ? `Metadata path: ${payload.attachments.metadataPath}` : "",
+  ].filter(Boolean).join("\n");
 }
 
 export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ success: boolean; requestId: string }> {
@@ -159,6 +211,7 @@ export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ su
     requester_email: data.requesterEmail,
     request_title: data.title,
     request_description: data.description,
+    pricing_mode: "quote",
     material_color_id: data.materialColorId ?? "",
     material_request_notes: data.materialRequestNotes ?? "",
     model_source_url: data.sourceMode === "link" ? data.sourceLink?.trim() ?? "" : "",
@@ -188,6 +241,41 @@ export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ su
     if (!uploadResult.success) throw new Error(uploadResult.error ?? "STL upload failed.");
   }
 
+  return { success: true, requestId };
+}
+
+export async function submitTokenforgePrintRequest(payload: TokenforgePrintRequestPayload): Promise<{ success: boolean; requestId: string }> {
+  const client = requireSupabase();
+  const requestPayload = {
+    requester_name: payload.customer.displayName,
+    requester_email: payload.customer.contact,
+    request_title: payload.item.name || payload.source.projectName || "Tokenforge print request",
+    request_description: buildTokenforgeDescription(payload),
+    pricing_mode: payload.pricingMode,
+    material_color_id: "",
+    material_request_notes: buildTokenforgeMaterialNotes(payload),
+    model_source_url: firstSafeUrl(payload.item.modelUrl, payload.item.galleryUrl, payload.item.previewUrl, payload.item.imageUrl),
+    reply_requested: false,
+    licensing_confirmed: true,
+    personal_design: false,
+    shipping_requested: false,
+    shipping_notes: "",
+    advanced_mode_used: payload.print.layerHeightMm != null || payload.print.nozzleMm != null,
+    layer_height: payload.print.layerHeightMm?.toString() ?? "",
+    infill_type: "",
+    infill_percent: "",
+    wall_count: "",
+    rough_estimated_volume_cm3: "",
+    rough_estimated_grams: payload.print.estimatedGrams?.toString() ?? "",
+    rough_estimated_material_cost: "",
+    rough_estimate_version: payload.source.generatorVersion || payload.schema,
+    rough_estimate_generated_at: payload.createdAt,
+    tokenforge_payload: payload,
+  };
+
+  const { data: requestId, error } = await client.rpc("submit_print_request", { request_payload: requestPayload });
+  if (error) throw error;
+  if (!requestId || typeof requestId !== "string") throw new Error("Supabase did not return a request id.");
   return { success: true, requestId };
 }
 
