@@ -9,6 +9,7 @@ Use this checklist after Supabase migrations and owner setup are complete. It is
 - Supabase Auth redirect URLs include local dev and production owner URLs.
 - An owner Auth user exists and has an active `owner_members` row.
 - The `request-models` bucket exists and is private.
+- The `gallery-images` bucket exists and is public.
 - At least one active `materials` row and one active `material_colors` row exist.
 
 ## Local app start
@@ -24,36 +25,22 @@ Open:
 http://localhost:5173/tokenforge-printdesk/request
 ```
 
-## Public requester path: model URL
+## Public requester path
 
 1. Fill out **Name**, **Email**, **Request title**, and **Description**.
-2. In **Model Source**, leave **Paste a model URL** selected.
-3. Paste a valid public model URL, such as a Printables, Thingiverse, MakerWorld, GitHub, or direct download page.
-4. Confirm the STL upload control and preview are hidden.
-5. Choose a material/color if one is available.
-6. Check the licensing confirmation box.
-7. Submit the request.
-8. Confirm the success state shows a request reference ID and says no payment is requested at submission time.
-
-## Public requester path: STL upload
-
-1. Fill out **Name**, **Email**, **Request title**, and **Description**.
-2. In **Model Source**, switch to **Upload an STL file**.
-3. Confirm the model URL field is hidden.
-4. Upload `public/test-assets/smoke-cube.stl`.
-5. Confirm the STL preview renders and the bounds text appears.
-6. Choose a material/color if one is available.
-7. Optionally run **Estimate material cost**.
-8. Check the licensing confirmation box.
-9. Submit the request.
-10. Confirm the success state shows a request reference ID and says no payment is requested at submission time.
+2. Choose a material/color if one is available.
+3. Upload `public/test-assets/smoke-cube.stl`.
+4. Confirm the STL preview renders and the bounds text appears.
+5. Check the licensing confirmation box.
+6. Submit the request.
+7. Confirm the success state shows a request reference ID and says no payment is requested at submission time.
 
 ## Supabase verification
 
 In Supabase Table Editor or SQL Editor, verify:
 
 ```sql
-select id, requester_email, request_title, model_source_url, status, payment_status, payment_required
+select id, requester_email, request_title, status, payment_status, payment_required
 from public.print_requests
 order by received_at desc
 limit 5;
@@ -65,10 +52,8 @@ Expected result:
 - `status = 'submitted'`
 - public requester submissions have `payment_required = true`
 - public requester submissions have `payment_status = 'not_started'`
-- link-based requests have `model_source_url` populated
-- upload-based requests have `model_source_url` empty/null
 
-Then verify STL metadata for upload-based requests:
+Then verify the STL metadata exists:
 
 ```sql
 select request_id, bucket, storage_path, original_filename, size_bytes, validation_status
@@ -77,16 +62,11 @@ order by uploaded_at desc
 limit 5;
 ```
 
-Expected result for upload-based requests:
+Expected result:
 
 - `bucket = 'request-models'`
 - `storage_path` looks like `requests/<request-id>/model.stl`
 - the file is recorded against the submitted request
-
-Expected result for link-based requests:
-
-- no `request_files` row is required
-- the owner queue should show an **Open link** action instead of **Open STL**
 
 ## Owner path
 
@@ -95,11 +75,9 @@ Expected result for link-based requests:
 3. Open the magic link.
 4. Confirm `/owner` loads the dashboard instead of redirecting back to login.
 5. Confirm the new request appears in the queue.
-6. For an uploaded request, open the **Open STL** action from the queue.
-7. For a linked request, open the **Open link** action from the queue.
-8. Change the request status to `reviewing` or another owner-managed state.
-9. Refresh and confirm the status persisted.
-10. Open the **Portfolio Gallery** tab and confirm it links to the Personal-Static portfolio instead of duplicating gallery management here.
+6. Open the STL download link from the queue.
+7. Change the request status to `reviewing` or another owner-managed state.
+8. Refresh and confirm the status persisted.
 
 ## Family/trusted requester check
 
@@ -109,13 +87,9 @@ Expected result for link-based requests:
 
 ## Negative checks
 
-- Select **Paste a model URL** and submit without a URL: the form should show a validation error.
-- Select **Paste a model URL** and enter a non-URL value: the form should show a validation error.
-- Select **Upload an STL file** and submit without an STL: the form should show a validation error.
+- Submit without an STL: the form should show a validation error.
 - Upload a non-STL file: the form should reject it before submission.
 - Upload an STL larger than 40 MB: the form should reject it before submission.
-- Switch from upload mode to link mode: the STL preview/upload state should clear.
-- Switch from link mode to upload mode: the URL field should clear and hide.
 - Try opening `/owner` while signed out: it should redirect to `/owner/login`.
 - Try owner login with an Auth user that is not active in `owner_members`: it should not load the dashboard.
 

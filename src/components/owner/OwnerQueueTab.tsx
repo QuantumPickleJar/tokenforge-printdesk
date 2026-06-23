@@ -110,7 +110,7 @@ function QueueRow({ req, selected, toggle, reload }: { req: PrintRequest; select
       <td><span className="badge badge-muted text-xs">{req.requestType === "family_free" ? "Family" : "Public"}</span></td>
       <td><StatusBadge status={req.status} /></td>
       <td className="text-sm text-muted">{req.materialLabel ?? "—"}</td>
-      <td className="text-xs"><ModelSource req={req} openModel={openModel} /></td>
+      <td className="text-xs">{req.modelAttached ? <button className="btn btn-ghost btn-sm" onClick={openModel}>Open</button> : "—"}</td>
       <td className="text-xs">{req.advancedMode ? "✅" : "—"}</td>
       <td className="text-xs text-muted font-mono">{req.roughMaterialEstimate != null ? `$${req.roughMaterialEstimate.toFixed(2)}` : "—"}</td>
       <td className="text-xs font-mono">{req.ownerFinalPrice != null ? `$${req.ownerFinalPrice.toFixed(2)}` : "—"}</td>
@@ -119,20 +119,4 @@ function QueueRow({ req, selected, toggle, reload }: { req: PrintRequest; select
       <td><select className="form-select" value={req.status} onChange={(e) => changeStatus(e.target.value as RequestStatus)}>{STATUS_ACTIONS.map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></td>
     </tr>
   );
-}
-
-function ModelSource({ req, openModel }: { req: PrintRequest; openModel: () => Promise<void> }) {
-  if (req.modelAttached) {
-    return <button className="btn btn-ghost btn-sm" onClick={openModel}>Open STL</button>;
-  }
-
-  if (req.sourceLink) {
-    return (
-      <a className="btn btn-ghost btn-sm" href={req.sourceLink} target="_blank" rel="noopener noreferrer">
-        Open link
-      </a>
-    );
-  }
-
-  return <span className="text-muted">—</span>;
 }

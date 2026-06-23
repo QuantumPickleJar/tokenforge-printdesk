@@ -1,25 +1,26 @@
 import { useEffect, useState } from "react";
 import { OwnerFamilyTab } from "../components/owner/OwnerFamilyTab";
+import { OwnerGalleryTab } from "../components/owner/OwnerGalleryTab";
 import { OwnerMaterialsTab } from "../components/owner/OwnerMaterialsTab";
 import { OwnerQueueTab } from "../components/owner/OwnerQueueTab";
 import { OwnerQuotesTab } from "../components/owner/OwnerQuotesTab";
 import { fetchFamilyGroups, fetchFamilyMembers } from "../services/familyService";
+import { fetchAllGallery } from "../services/galleryService";
 import { fetchMaterialColors, fetchMaterials } from "../services/materialService";
 import { signOutOwner } from "../services/ownerService";
 import { fetchRequests } from "../services/requestService";
 import type { FamilyGroup, FamilyMember } from "../types/family";
+import type { GalleryEntry } from "../types/gallery";
 import type { Material, MaterialColor } from "../types/materials";
 import type { PrintRequest } from "../types/printRequest";
 import "./OwnerDashboardPage.css";
 
 type DashTab = "queue" | "materials" | "gallery" | "family" | "quotes" | "settings";
 
-const PORTFOLIO_GALLERY_URL = "https://quantumpicklejar.github.io/Personal-Static/";
-
 const TABS: { id: DashTab; label: string }[] = [
   { id: "queue", label: "Queue Requests" },
   { id: "materials", label: "Materials" },
-  { id: "gallery", label: "Portfolio Gallery" },
+  { id: "gallery", label: "Gallery" },
   { id: "family", label: "Family / Trusted Requesters" },
   { id: "quotes", label: "Quotes / Payments" },
   { id: "settings", label: "Settings" },
@@ -30,16 +31,18 @@ export function OwnerDashboardPage() {
   const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [colors, setColors] = useState<MaterialColor[]>([]);
+  const [gallery, setGallery] = useState<GalleryEntry[]>([]);
   const [groups, setGroups] = useState<FamilyGroup[]>([]);
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   async function reload() {
-    const [requestRows, materialRows, colorRows, groupRows, memberRows] = await Promise.all([
+    const [requestRows, materialRows, colorRows, galleryRows, groupRows, memberRows] = await Promise.all([
       fetchRequests(),
       fetchMaterials(),
       fetchMaterialColors(),
+      fetchAllGallery(),
       fetchFamilyGroups(),
       fetchFamilyMembers(),
     ]);
@@ -47,6 +50,7 @@ export function OwnerDashboardPage() {
     setRequests(requestRows);
     setMaterials(materialRows);
     setColors(colorRows);
+    setGallery(galleryRows);
     setGroups(groupRows);
     setMembers(memberRows);
   }
@@ -88,24 +92,12 @@ export function OwnerDashboardPage() {
         <div className="tab-panel" role="tabpanel">
           {tab === "queue" && <OwnerQueueTab requests={requests} reload={reload} />}
           {tab === "materials" && <OwnerMaterialsTab materials={materials} colors={colors} reload={reload} />}
-          {tab === "gallery" && <PortfolioGalleryTab />}
+          {tab === "gallery" && <OwnerGalleryTab gallery={gallery} reload={reload} />}
           {tab === "family" && <OwnerFamilyTab groups={groups} members={members} reload={reload} />}
           {tab === "quotes" && <OwnerQuotesTab requests={requests} reload={reload} />}
           {tab === "settings" && <SettingsTab />}
         </div>
       </section>
-    </div>
-  );
-}
-
-function PortfolioGalleryTab() {
-  return (
-    <div className="alert alert-info">
-      <span>↗️</span>
-      <span>
-        Successful print photos should live in the portfolio instead of being duplicated here. Open the Personal-Static portfolio gallery to add or review public-facing work: {" "}
-        <a href={PORTFOLIO_GALLERY_URL} target="_blank" rel="noopener noreferrer">Open portfolio</a>.
-      </span>
     </div>
   );
 }

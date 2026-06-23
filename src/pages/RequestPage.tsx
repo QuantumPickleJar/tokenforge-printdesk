@@ -7,7 +7,7 @@ import { submitRequest } from "../services/requestService";
 import { isSupabaseConfigured } from "../services/supabaseClient";
 import { analyzeStlFile, validateStlFile, type StlAnalysisResult } from "../services/stlAnalyzer";
 import type { MaterialVariant } from "../types/materials";
-import type { InfillType, ModelSourceMode } from "../types/printRequest";
+import type { InfillType } from "../types/printRequest";
 import "./RequestPage.css";
 
 interface FormState {
@@ -17,7 +17,6 @@ interface FormState {
   description: string;
   materialType: string;
   materialColorId: string;
-  sourceMode: ModelSourceMode;
   sourceLink: string;
   replyRequested: boolean;
   licensingConfirmed: boolean;
@@ -37,7 +36,6 @@ const DEFAULT_FORM: FormState = {
   description: "",
   materialType: "",
   materialColorId: "",
-  sourceMode: "link",
   sourceLink: "",
   replyRequested: false,
   licensingConfirmed: false,
@@ -58,15 +56,6 @@ const INFILL_OPTIONS: { value: InfillType; label: string }[] = [
   { value: "cubic", label: "Cubic" },
   { value: "lines", label: "Lines" },
 ];
-
-function isValidHttpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 export function RequestPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
@@ -91,7 +80,6 @@ export function RequestPage() {
   const materialTypes = useMemo(() => Array.from(new Set(materials.map((m) => m.materialType))), [materials]);
   const filteredColors = form.materialType ? materials.filter((m) => m.materialType === form.materialType) : materials;
   const selectedMaterial = materials.find((m) => m.id === form.materialColorId);
-  const canEstimate = form.sourceMode === "upload" && Boolean(selectedMaterial && stlFile && !stlError);
 
   function handleChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value, type } = e.target;
@@ -100,22 +88,6 @@ export function RequestPage() {
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
       ...(name === "materialType" ? { materialColorId: "" } : {}),
     }));
-  }
-
-  function handleSourceModeChange(e: ChangeEvent<HTMLSelectElement>) {
-    const sourceMode = e.target.value as ModelSourceMode;
-    setForm((prev) => ({
-      ...prev,
-      sourceMode,
-      sourceLink: sourceMode === "upload" ? "" : prev.sourceLink,
-    }));
-    setSubmitError(undefined);
-    setEstimate(null);
-    if (sourceMode === "link") {
-      setStlFile(undefined);
-      setStlAnalysis(undefined);
-      setStlError(undefined);
-    }
   }
 
   async function handleStlChange(e: ChangeEvent<HTMLInputElement>) {
@@ -155,14 +127,6 @@ export function RequestPage() {
       setSubmitError("Choose a material and color before estimating.");
       return;
     }
-    if (form.sourceMode !== "upload") {
-      setSubmitError("Material estimates are only available when an STL is uploaded. Linked models are estimated after owner review.");
-      return;
-    }
-    if (!stlFile || stlError) {
-      setSubmitError("Upload a valid STL before estimating.");
-      return;
-    }
     setEstimating(true);
     setSubmitError(undefined);
     try {
@@ -188,9 +152,8 @@ export function RequestPage() {
     setSubmitError(undefined);
     try {
       if (!supabaseReady) throw new Error("Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before accepting live requests.");
-      if (form.sourceMode === "upload" && !stlFile) throw new Error("Upload a valid .stl file before submitting.");
-      if (form.sourceMode === "upload" && stlError) throw new Error(`Fix the STL upload before submitting: ${stlError}`);
-      if (form.sourceMode === "link" && !isValidHttpUrl(form.sourceLink.trim())) throw new Error("Paste a valid http or https model URL before submitting.");
+      if (!stlFile) throw new Error("Upload a valid .stl file before submitting.");
+      if (stlError) throw new Error(`Fix the STL upload before submitting: ${stlError}`);
       if (!form.licensingConfirmed) throw new Error("You must confirm licensing/source rights before submitting.");
       const result = await submitRequest({
         requesterName: form.name,
@@ -198,8 +161,7 @@ export function RequestPage() {
         title: form.title,
         description: form.description,
         materialColorId: form.materialColorId || undefined,
-        sourceMode: form.sourceMode,
-        sourceLink: form.sourceMode === "link" ? form.sourceLink.trim() : undefined,
+        sourceLink: form.sourceLink || undefined,
         replyRequested: form.replyRequested,
         licensingConfirmed: form.licensingConfirmed,
         personalDesign: form.personalDesign,
@@ -208,7 +170,7 @@ export function RequestPage() {
         advancedMode,
         advancedSettings: advancedMode ? readAdvancedSettings() : undefined,
         roughEstimate: estimate ?? undefined,
-        stlFile: form.sourceMode === "upload" ? stlFile : undefined,
+        stlFile,
       });
       setSubmitted(result.requestId);
     } catch (error) {
@@ -228,7 +190,7 @@ export function RequestPage() {
               <strong>Request received.</strong><br />Reference ID: <code className="font-mono">{submitted}</code>
             </div>
           </div>
-          <p className="text-muted">The owner will review your model source and request details before quoting. No payment is requested at submission time.</p>
+          <p className="text-muted">The owner will review your STL and request details before quoting. No payment is requested at submission time.</p>
           <button className="btn btn-secondary" style={{ marginTop: "1rem" }} onClick={resetForm}>
             Submit another request
           </button>
@@ -241,7 +203,7 @@ export function RequestPage() {
     <div className="container">
       <section className="section">
         <h1 className="section-title">Request a Quote</h1>
-        <p className="section-subtitle">Paste a model URL or upload an STL, then describe the print. The owner reviews requests before accepting, quoting, or asking follow-up questions.</p>
+        <p className="section-subtitle">Upload an STL and describe the print. The owner reviews requests before accepting, quoting, or asking follow-up questions.</p>
 
         {!supabaseReady && (
           <div className="alert alert-warning" style={{ marginBottom: "1.5rem" }}>
@@ -263,37 +225,7 @@ export function RequestPage() {
             <legend>Print Request Details</legend>
             <div className="form-group"><label className="form-label" htmlFor="req-title">Request title <span className="required">*</span></label><input id="req-title" name="title" className="form-input" value={form.title} onChange={handleChange} required /></div>
             <div className="form-group"><label className="form-label" htmlFor="req-description">Description <span className="required">*</span></label><textarea id="req-description" name="description" className="form-textarea" value={form.description} onChange={handleChange} required rows={5} /></div>
-          </fieldset>
-
-          <fieldset className="request-fieldset">
-            <legend>Model Source</legend>
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-source-mode">How do you want to provide the model? <span className="required">*</span></label>
-              <select id="req-source-mode" name="sourceMode" className="form-select" value={form.sourceMode} onChange={handleSourceModeChange}>
-                <option value="link">Paste a model URL</option>
-                <option value="upload">Upload an STL file</option>
-              </select>
-              <p className="form-hint">Choose one source. The other option is hidden so the request stays unambiguous.</p>
-            </div>
-
-            {form.sourceMode === "link" ? (
-              <div className="form-group">
-                <label className="form-label" htmlFor="req-source-link">Model URL <span className="required">*</span></label>
-                <input id="req-source-link" name="sourceLink" type="url" className="form-input" value={form.sourceLink} onChange={handleChange} placeholder="https://www.printables.com/model/..." required />
-                <p className="form-hint">Use a public model page or download link. The owner will inspect the model before accepting or quoting.</p>
-              </div>
-            ) : (
-              <div className="form-group">
-                <label className="form-label" htmlFor="req-stl">Upload STL file <span className="text-subtle">(.stl only, max 40 MB)</span></label>
-                <input id="req-stl" name="stlFile" type="file" accept=".stl" className="form-input" onChange={handleStlChange} required />
-                <p className="form-hint">
-                  Testing the flow? Use the included <a href={`${import.meta.env.BASE_URL}test-assets/smoke-cube.stl`} download>smoke-test cube STL</a>.
-                </p>
-                {stlError && <p className="text-error text-sm" role="alert">{stlError}</p>}
-                {stlAnalysis?.boundingBoxMm && <p className="form-hint">Bounds: {stlAnalysis.boundingBoxMm.x.toFixed(1)} × {stlAnalysis.boundingBoxMm.y.toFixed(1)} × {stlAnalysis.boundingBoxMm.z.toFixed(1)} mm</p>}
-                <StlPreview file={stlFile} />
-              </div>
-            )}
+            <div className="form-group"><label className="form-label" htmlFor="req-source-link">Source / model link <span className="text-subtle">(optional)</span></label><input id="req-source-link" name="sourceLink" type="url" className="form-input" value={form.sourceLink} onChange={handleChange} /></div>
           </fieldset>
 
           <fieldset className="request-fieldset">
@@ -315,10 +247,23 @@ export function RequestPage() {
               </div>
             </div>
             <div className="estimate-block">
-              <button type="button" className="btn btn-secondary" onClick={handleEstimate} disabled={estimating || !canEstimate}>{estimating ? "Estimating…" : "Estimate material cost"}</button>
-              {form.sourceMode === "link" && <p className="form-hint">Material estimates are skipped for link-only requests until the owner reviews the model.</p>}
+              <button type="button" className="btn btn-secondary" onClick={handleEstimate} disabled={estimating || !selectedMaterial}>{estimating ? "Estimating…" : "Estimate material cost"}</button>
               {estimate && <div className="estimate-result"><div className="badge badge-warning" style={{ marginBottom: "0.5rem" }}>Rough material estimate</div><p>≈ <strong>{estimate.estimatedGrams} g</strong> | Material cost ≈ <strong>${estimate.estimatedMaterialCost.toFixed(2)}</strong></p><p className="text-xs text-muted">{estimate.disclaimer}</p></div>}
             </div>
+          </fieldset>
+
+          <fieldset className="request-fieldset">
+            <legend>STL / Model File</legend>
+            <div className="form-group">
+              <label className="form-label" htmlFor="req-stl">Upload STL file <span className="text-subtle">(.stl only, max 40 MB)</span></label>
+              <input id="req-stl" name="stlFile" type="file" accept=".stl" className="form-input" onChange={handleStlChange} required />
+              <p className="form-hint">
+                Testing the flow? Use the included <a href={`${import.meta.env.BASE_URL}test-assets/smoke-cube.stl`} download>smoke-test cube STL</a>.
+              </p>
+              {stlError && <p className="text-error text-sm" role="alert">{stlError}</p>}
+              {stlAnalysis?.boundingBoxMm && <p className="form-hint">Bounds: {stlAnalysis.boundingBoxMm.x.toFixed(1)} × {stlAnalysis.boundingBoxMm.y.toFixed(1)} × {stlAnalysis.boundingBoxMm.z.toFixed(1)} mm</p>}
+            </div>
+            <StlPreview file={stlFile} />
           </fieldset>
 
           <fieldset className="request-fieldset">
