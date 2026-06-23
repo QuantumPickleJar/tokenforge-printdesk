@@ -20,6 +20,8 @@ export type RequestStatus =
 
 export type RequestType = "public_quote" | "family_free" | "owner_internal";
 
+export type ModelSourceMode = "upload" | "link";
+
 export type PaymentStatus =
   | "not_required"
   | "not_started"
@@ -114,6 +116,7 @@ export interface SubmitPrintRequestInput {
   description: string;
   materialColorId?: string;
   materialRequestNotes?: string;
+  sourceMode: ModelSourceMode;
   sourceLink?: string;
   replyRequested: boolean;
   licensingConfirmed: boolean;
