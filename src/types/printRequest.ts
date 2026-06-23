@@ -1,3 +1,5 @@
+import type { PricingMode, TokenforgePrintRequestPayload } from "./tokenforgeHandoff";
+
 export type RequestStatus =
   | "submitted"
   | "reviewing"
@@ -82,6 +84,7 @@ export interface PrintRequest {
   receivedAt: string;
   status: RequestStatus;
   requestType: RequestType;
+  pricingMode: PricingMode;
   paymentRequired: boolean;
   paymentStatus: PaymentStatus;
   requesterName: string;
@@ -107,6 +110,7 @@ export interface PrintRequest {
   roughMaterialEstimate?: number;
   ownerFinalPrice?: number;
   ownerNotes?: string | null;
+  tokenforgePayload?: TokenforgePrintRequestPayload | null;
 }
 
 export interface SubmitPrintRequestInput {
