@@ -28,6 +28,11 @@ export function AppNav() {
               </NavLink>
             </li>
             <li>
+              <NavLink to="/generator" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+                Generator JSON
+              </NavLink>
+            </li>
+            <li>
               <NavLink to="/owner/login" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                 Owner Login
               </NavLink>
