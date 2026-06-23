@@ -46,8 +46,6 @@ export interface TokenforgePrintRequestPayload {
   pricingMode?: TokenforgePricingMode;
 }
 
-export interface ParseTokenforgePrintRequestResult {
-  ok: boolean;
-  payload?: TokenforgePrintRequestPayload;
-  error?: string;
-}
+export type ParseTokenforgePrintRequestResult =
+  | { ok: true; payload: TokenforgePrintRequestPayload; error?: never }
+  | { ok: false; error: string; payload?: never };
