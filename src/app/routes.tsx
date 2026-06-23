@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { OwnerRoute } from "../components/auth/OwnerRoute";
 import { AppShell } from "../components/layout/AppShell";
 import { HomePage } from "../pages/HomePage";
@@ -21,6 +21,7 @@ export function AppRoutes() {
         <Route path="/owner/login" element={<OwnerLoginPage />} />
         <Route path="/owner" element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
         <Route path="/owner/intake" element={<OwnerIntakePage />} />
+        <Route path="/generator" element={<Navigate to="/owner/intake" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
