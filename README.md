@@ -38,12 +38,12 @@ VITE_SUPABASE_ANON_KEY=
 
 1. Link the project:
    ```bash
-   supabase login
-   supabase link --project-ref <your-project-ref>
+   npx supabase login
+   npx supabase link --project-ref <your-project-ref>
    ```
 2. Push migrations:
    ```bash
-   supabase db push
+   npx supabase db push
    ```
 3. Confirm the storage buckets exist:
    - `request-models`: private, app-level STL-only flow, 40 MB limit.
@@ -54,7 +54,13 @@ VITE_SUPABASE_ANON_KEY=
 5. Create the owner in Supabase Auth.
 6. Insert an active `owner_members` row linked to that Auth user id. Do not hardcode the owner email in frontend code.
 
+If `supabase` is not a recognized command, use `npx supabase ...` as shown above or install the Supabase CLI through an officially supported method.
+
 If `supabase db push` fails with `relation "supabase_migrations.schema_migrations" does not exist`, do not patch production tables by hand. Verify the project is linked correctly, then repair or initialize migration metadata through the Supabase CLI workflow. Keep schema changes in `supabase/migrations`.
+
+## Request-flow smoke test
+
+After Supabase setup, run the manual smoke test in [`docs/request-flow-smoke-test.md`](docs/request-flow-smoke-test.md). The repository includes a tiny known-good STL at `public/test-assets/smoke-cube.stl` so request submissions can be tested without hunting for a model file.
 
 ## Database schema
 
