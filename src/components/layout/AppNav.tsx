@@ -10,7 +10,7 @@ export function AppNav() {
           <span className="app-nav__brand-name">TokenForge <span className="app-nav__brand-sub">PrintDesk</span></span>
         </Link>
 
-        <nav aria-label="Main navigation">
+        <nav className="app-nav__nav" aria-label="Main navigation">
           <ul className="app-nav__links" role="list">
             <li>
               <NavLink to="/" end className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
@@ -24,16 +24,11 @@ export function AppNav() {
             </li>
             <li>
               <NavLink to="/request" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                Request a Quote
+                Request
               </NavLink>
             </li>
             <li>
-              <NavLink to="/generator" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
-                Generator JSON
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/owner/login" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
+              <NavLink to="/owner/login" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
                 Owner Login
               </NavLink>
             </li>
