@@ -64,7 +64,8 @@ export function validateTokenforgePrintRequestPayload(value: unknown): Tokenforg
     throw new Error('pricingMode must be "quote", "family", or "free" when provided.');
   }
 
-  return value as TokenforgePrintRequestPayload;
+  // The runtime assertions above establish the external JSON shape; TypeScript cannot infer that from Record<string, unknown> alone.
+  return value as unknown as TokenforgePrintRequestPayload;
 }
 
 export function parseTokenforgePrintRequestJson(jsonText: string): ParseTokenforgePrintRequestResult {
