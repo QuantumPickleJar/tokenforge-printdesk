@@ -138,7 +138,9 @@ function mapRequest(row: RequestRow): PrintRequest {
 }
 
 export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ success: boolean; requestId: string }> {
-  if (!data.stlFile) throw new Error("An STL file is required.");
+  if (data.sourceMode === "upload" && !data.stlFile) throw new Error("An STL file is required for upload-based requests.");
+  if (data.sourceMode === "link" && !data.sourceLink?.trim()) throw new Error("A model link is required for link-based requests.");
+
   const client = requireSupabase();
   const requestPayload = {
     requester_name: data.requesterName,
@@ -147,7 +149,7 @@ export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ su
     request_description: data.description,
     material_color_id: data.materialColorId ?? "",
     material_request_notes: data.materialRequestNotes ?? "",
-    model_source_url: data.sourceLink ?? "",
+    model_source_url: data.sourceMode === "link" ? data.sourceLink?.trim() ?? "" : "",
     reply_requested: data.replyRequested,
     licensing_confirmed: data.licensingConfirmed,
     personal_design: data.personalDesign,
@@ -169,8 +171,11 @@ export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ su
   if (error) throw error;
   if (!requestId || typeof requestId !== "string") throw new Error("Supabase did not return a request id.");
 
-  const uploadResult = await uploadStlFile(requestId, data.stlFile);
-  if (!uploadResult.success) throw new Error(uploadResult.error ?? "STL upload failed.");
+  if (data.stlFile) {
+    const uploadResult = await uploadStlFile(requestId, data.stlFile);
+    if (!uploadResult.success) throw new Error(uploadResult.error ?? "STL upload failed.");
+  }
+
   return { success: true, requestId };
 }
 
