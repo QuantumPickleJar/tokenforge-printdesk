@@ -138,8 +138,20 @@ function mapRequest(row: RequestRow): PrintRequest {
 }
 
 export async function submitRequest(data: SubmitPrintRequestInput): Promise<{ success: boolean; requestId: string }> {
+  if (data.stlFile && data.sourceLink?.trim()) throw new Error("Cannot submit both an STL file and a source link. Please provide only one source for your model.");
   if (data.sourceMode === "upload" && !data.stlFile) throw new Error("An STL file is required for upload-based requests.");
   if (data.sourceMode === "link" && !data.sourceLink?.trim()) throw new Error("A model link is required for link-based requests.");
+  if (data.sourceMode === "link") {
+    let parsed: URL;
+    try {
+      parsed = new URL(data.sourceLink!.trim());
+    } catch {
+      throw new Error("The model link is not a valid URL.");
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      throw new Error("Model links must use http or https.");
+    }
+  }
 
   const client = requireSupabase();
   const requestPayload = {
