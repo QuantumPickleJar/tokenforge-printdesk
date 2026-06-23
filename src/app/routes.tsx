@@ -7,6 +7,7 @@ import { RequestPage } from "../pages/RequestPage";
 import { QuotePage } from "../pages/QuotePage";
 import { OwnerLoginPage } from "../pages/OwnerLoginPage";
 import { OwnerDashboardPage } from "../pages/OwnerDashboardPage";
+import { OwnerIntakePage } from "../pages/OwnerIntakePage";
 import { NotFoundPage } from "../pages/NotFoundPage";
 
 export function AppRoutes() {
@@ -19,6 +20,7 @@ export function AppRoutes() {
         <Route path="/quote/:token" element={<QuotePage />} />
         <Route path="/owner/login" element={<OwnerLoginPage />} />
         <Route path="/owner" element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
+        <Route path="/owner/intake" element={<OwnerIntakePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
