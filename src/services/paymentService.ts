@@ -21,17 +21,17 @@
 import type { Quote } from "../types/quotes";
 
 /** Record that a manually-paid quote payment has been confirmed (owner action, stub). */
-export async function markQuotePaid(_quoteId: string): Promise<void> {
+export async function markQuotePaid(quoteId: string): Promise<void> {
   // TODO: supabase.from("quotes").update({ payment_status: "paid", paid_at: ... })
   // Must verify owner auth before calling.
-  console.warn("[paymentService] markQuotePaid is not implemented in scaffold.");
+  console.warn("[paymentService] markQuotePaid is not implemented in scaffold.", { quoteId });
 }
 
 /** Mark a quote payment as waived (owner action for family requests, stub). */
-export async function waivedPayment(_quoteId: string): Promise<void> {
+export async function waivedPayment(quoteId: string): Promise<void> {
   // TODO: supabase.from("quotes").update({ payment_status: "waived" })
   // Must verify owner auth before calling.
-  console.warn("[paymentService] waivedPayment is not implemented in scaffold.");
+  console.warn("[paymentService] waivedPayment is not implemented in scaffold.", { quoteId });
 }
 
 /**
