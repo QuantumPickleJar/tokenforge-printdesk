@@ -1,310 +1,165 @@
 # TokenForge PrintDesk
 
-> **Status: v0.1 Scaffold — Not production-ready.**
-> This is a structural scaffold. Core UI, routing, types, and service stubs
-> are in place. Supabase integration, real file upload, and production auth
-> are intentionally deferred to the next implementation pass.
+> **Status: v0.1 Supabase core pass. Not production-hardened yet.**
 
-A request-and-quote system for 3D printing. Requesters submit print jobs,
-the owner reviews them and generates quotes, and payment/pickup is coordinated
-via owner-provided links. No automatic payment processing. No auto-approval.
-
----
-
-## Table of contents
-
-1. [Tech stack](#tech-stack)
-2. [Local setup](#local-setup)
-3. [Environment variables](#environment-variables)
-4. [Supabase setup (placeholder)](#supabase-setup-placeholder)
-5. [GitHub Pages deployment](#github-pages-deployment)
-6. [What is implemented](#what-is-implemented)
-7. [What is intentionally deferred](#what-is-intentionally-deferred)
-8. [Folder structure](#folder-structure)
-9. [Routes](#routes)
-10. [Next implementation pass checklist](#next-implementation-pass-checklist)
-
----
+TokenForge PrintDesk is a static React app for personal 3D print requests, owner review, family/trusted-requester workflows, quote creation, manual payment links, and public gallery management. The frontend is deployable to GitHub Pages. Supabase provides Auth, Postgres, Storage, RLS, and future Edge Function boundaries.
 
 ## Tech stack
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| [Vite](https://vite.dev) | ^8 | Build tool / dev server |
-| [React](https://react.dev) | ^19 | UI framework |
-| [TypeScript](https://www.typescriptlang.org) | ~6 | Type safety |
-| [React Router](https://reactrouter.com) | ^7 | Client-side routing |
-| [@supabase/supabase-js](https://supabase.com/docs/reference/javascript) | ^2 | DB / Auth / Storage client |
-| [Three.js](https://threejs.org) | ^0.184 | STL preview (prepared, not wired) |
-| Plain CSS | — | Styling (no heavy UI framework) |
+- Vite + React + TypeScript
+- React Router
+- Supabase JS client
+- Supabase Postgres + RLS + Storage
+- Three.js + STLLoader for client-side STL preview
+- GitHub Pages static deployment
 
----
+No Stripe/PayPal API automation, slicing, G-code generation, printer integration, or Raspberry Pi worker is implemented in this pass.
 
 ## Local setup
 
-**Prerequisites:** Node.js ≥ 20, npm ≥ 10.
-
 ```bash
-# 1. Clone
 git clone https://github.com/QuantumPickleJar/tokenforge-printdesk.git
 cd tokenforge-printdesk
-
-# 2. Install dependencies
 npm install
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env and fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
-
-# 4. Start dev server
+cp .env.example .env.local
 npm run dev
 ```
 
-The app starts at `http://localhost:5173/tokenforge-printdesk/`.
-
-If Supabase env vars are missing, the app shows a development warning in the
-console and falls back to mock data — it does not crash.
-
----
-
-## Environment variables
-
-Copy `.env.example` to `.env` and fill in your values:
+Set:
 
 ```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
 ```
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `VITE_SUPABASE_URL` | Yes (production) | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes (production) | Supabase anonymous/public key |
+`.env.local` must not be committed. The frontend may only use the Supabase anon/publishable key. Service-role keys and provider secrets belong only in Supabase Edge Functions or local secure configuration.
 
-**Never commit `.env` to version control.** The `.gitignore` excludes it.
-Only the anonymous/public key belongs on the frontend — never the service-role key.
+## Supabase setup
 
----
+1. Link the project:
+   ```bash
+   supabase login
+   supabase link --project-ref <your-project-ref>
+   ```
+2. Push migrations:
+   ```bash
+   supabase db push
+   ```
+3. Confirm the storage buckets exist:
+   - `request-models`: private, app-level STL-only flow, 40 MB limit.
+   - `gallery-images`: public for v0.1, images only, 10 MB bucket limit.
+4. Configure Auth site URLs / redirect URLs for local dev and GitHub Pages:
+   - `http://localhost:5173/tokenforge-printdesk/owner`
+   - `https://<your-github-user>.github.io/tokenforge-printdesk/owner`
+5. Create the owner in Supabase Auth.
+6. Insert an active `owner_members` row linked to that Auth user id. Do not hardcode the owner email in frontend code.
 
-## Supabase setup (placeholder)
+If `supabase db push` fails with `relation "supabase_migrations.schema_migrations" does not exist`, do not patch production tables by hand. Verify the project is linked correctly, then repair or initialize migration metadata through the Supabase CLI workflow. Keep schema changes in `supabase/migrations`.
 
-> Full Supabase configuration is deferred to the implementation pass.
+## Database schema
 
-When implementing:
+The migration creates:
 
-1. Create a Supabase project at [supabase.com](https://supabase.com).
-2. Enable **Row Level Security (RLS)** on all tables before going live.
-3. Create tables: `requests`, `quotes`, `materials`, `gallery`, `family_groups`,
-   `family_members`, `processing_jobs`.
-4. Create a **private** Storage bucket for STL files (`private-stl`).
-5. Create a **public** Storage bucket for gallery images (`gallery-images`).
-6. Configure Auth for owner magic-link login.
-7. Add RLS policies: only the owner can read all rows; requesters access only
-   their own data via token-scoped policies.
+- `owner_members`
+- `materials`
+- `material_colors`
+- `gallery_items`
+- `gallery_images`
+- `family_groups`
+- `family_members`
+- `print_requests`
+- `request_files`
+- `quotes`
+- `request_events`
+- `notification_logs`
+- `processing_jobs`
+- `submission_events`
 
----
+PLA and PETG are seeded with editable placeholder density/cost values. Wood PLA is intentionally left out for v0.1.
+
+## Security/RLS notes
+
+RLS is enabled on all app tables in the migration.
+
+Anonymous/public users can:
+
+- read active materials/colors for the request form
+- read published gallery items/images
+- submit print requests through `submit_print_request`
+- upload an STL only to a controlled path under `request-models`
+- view/respond to a quote through token-scoped RPC functions
+
+Anonymous/public users should not be able to list requests, read owner notes, list request files, browse private STL storage, modify materials, modify gallery records, manage family members, or directly manage quotes.
+
+Owner/admin users are checked through active `owner_members` rows and can manage dashboard data through RLS-protected tables.
+
+Remaining security work before production:
+
+- server-side CAPTCHA/Turnstile validation
+- stronger rate limiting through an Edge Function
+- hashed IP logging from the server side
+- provider-side email delivery
+- full policy review in the hosted Supabase project
+- stronger quote-token lifecycle review
+
+## Implemented in this pass
+
+- Audited scaffold package/config/routing/services/pages/docs.
+- Corrected known scaffold mismatches:
+  - private bucket is `request-models`, not `private-stl`
+  - STL upload is `.stl` only
+  - public STL limit is 40 MB
+  - material model is split into `materials` and `material_colors`
+- Public request form creates real request records through Supabase RPC.
+- Request STL upload uses private Supabase Storage path `requests/{request_id}/model.stl`.
+- STL preview parses and renders selected STL files with Three.js.
+- Rough material estimate runs on button press and is labeled non-final.
+- Public gallery reads published records from Supabase.
+- Owner login uses Supabase magic-link Auth.
+- `/owner` is protected by an owner membership guard.
+- Owner dashboard reads real requests oldest-first and supports status updates.
+- Owner dashboard has basic materials/colors, gallery, family/trusted requester, and quote/payment tabs.
+- Family/trusted request classification is handled server-side by active email match and defaults to no payment required.
+- Manual quote-link flow is implemented; no automatic payment provider API exists.
+- Quote token page can accept/decline through token RPCs.
+- Notification rows are logged; real email delivery is stubbed.
+- Processing job table exists for future Raspberry Pi / TokenForge worker integration.
+
+## Deferred
+
+- Stripe/PayPal API automation and webhooks
+- slicer integration, G-code generation, printer integration
+- Raspberry Pi worker implementation
+- STL repair or printability guarantees
+- real email-provider delivery
+- image processing Edge Function
+- production-grade abuse prevention
+- custom owner settings UI polish
 
 ## GitHub Pages deployment
 
-The Vite config sets `base: '/tokenforge-printdesk/'` for GitHub Pages
-compatibility. React Router uses the same `basename`.
+`vite.config.ts` uses:
+
+```ts
+base: '/tokenforge-printdesk/'
+```
+
+React Router uses the matching basename. Build with:
 
 ```bash
-# Build for production
 npm run build
-
-# Output is in dist/ — deploy that directory to GitHub Pages
 ```
 
-To deploy via GitHub Actions, push to the default branch and configure
-the Pages source to use the `gh-pages` branch or the `dist/` folder via
-an Actions workflow.
+Deploy the generated `dist/` folder to GitHub Pages. A simple `public/404.html` fallback redirects unknown GitHub Pages routes back to the app root; direct deep links may need a richer SPA fallback later if route preservation matters.
 
-> If you add a custom domain, set `base: '/'` in `vite.config.ts` and
-> update the `BrowserRouter` `basename` in `src/app/App.tsx`.
+## Scripts
 
-**Note:** GitHub Pages serves static files. All routes fall through to
-`index.html` via a `404.html` redirect trick or a custom domain with
-proper SPA fallback. A `404.html` identical to `index.html` may be needed
-for direct URL access to sub-routes.
-
----
-
-## What is implemented
-
-- ✅ Vite + React + TypeScript project scaffold
-- ✅ React Router with all planned routes
-- ✅ Responsive app shell (header/nav, main, footer)
-- ✅ Home page with hero, how-it-works, feature list
-- ✅ Gallery page with mock data and card grid
-- ✅ Request form (placeholder) with all fields:
-  - Name, email, title, description, source link
-  - Material selection (mock materials)
-  - Color preference
-  - STL file input (validated, not uploaded)
-  - Licensing / personal design checkboxes
-  - Reply requested checkbox
-  - Shipping toggle
-  - Advanced mode toggle (layer height, infill type/%, wall count)
-  - Accessible help popovers for all advanced settings
-  - "Estimate material cost" button (returns clearly mocked rough estimate)
-- ✅ Quote page (`/quote/:token`) with mock quote display and accept/decline scaffold
-- ✅ Owner login page with mock magic-link UI
-- ✅ Owner dashboard with:
-  - Queue tab with mock data table (oldest-first)
-  - Bulk action controls (disabled/scaffold)
-  - Family/Trusted tab with mock groups
-  - Placeholder tabs: Requests, Materials, Gallery, Quotes/Payments, Settings
-- ✅ STL preview placeholder component (`src/components/stl/StlPreview.tsx`)
-- ✅ Supabase client with env-var guards (graceful warning if unconfigured)
-- ✅ All TypeScript types: `printRequest`, `materials`, `gallery`, `quotes`, `family`, `processing`
-- ✅ All service stubs with TODO comments: `requestService`, `materialService`, `galleryService`, `quoteService`, `storageService`, `stlAnalyzer`, `estimateService`, `paymentService`, `notificationService`, `processingJobService`
-- ✅ `.env.example` with required variables
-- ✅ GitHub Pages `base` configured in `vite.config.ts`
-- ✅ Responsive CSS with custom properties, no heavy UI framework
-- ✅ Accessible focus states, ARIA labels, semantic HTML
-- ✅ No secrets committed
-- ✅ No real payment processing
-- ✅ No real file upload
-- ✅ No production auth claims
-
----
-
-## What is intentionally deferred
-
-| Feature | Why deferred |
-|---------|-------------|
-| Supabase DB queries | Requires schema + RLS design review |
-| Real STL upload | Requires security review (file validation, private bucket config) |
-| Owner auth (Supabase Auth) | Requires session management, RLS, and rate-limiting |
-| Email notifications | Requires Edge Function + email provider setup |
-| Real material estimates | Requires processing worker (Pi/slicer) integration |
-| Payment provider API | No automatic payment in v0.1; manual links only |
-| Raspberry Pi processing worker | Separate system — not a frontend concern |
-| Gallery image upload | Requires public bucket config and CDN review |
-| Production 404 SPA fallback | Requires GitHub Pages `404.html` setup |
-| Quote token security | Server-side validation required; do not trust client token |
-
----
-
-## Folder structure
-
-```
-src/
-  app/
-    App.tsx          — Root app component with BrowserRouter
-    routes.tsx       — All route definitions
-  components/
-    common/
-      HelpPopover.tsx     — Accessible help tooltip/popover
-      StatusBadge.tsx     — Request/payment status badges
-    layout/
-      AppShell.tsx    — Page shell wrapper
-      AppNav.tsx      — Sticky header/nav
-      AppFooter.tsx   — Footer
-    stl/
-      StlPreview.tsx  — STL preview placeholder (Three.js deferred)
-    forms/            — (reserved for extracted form components)
-    gallery/          — (reserved for gallery sub-components)
-    owner/            — (reserved for dashboard sub-components)
-    settings-help/    — (reserved for settings/help components)
-  pages/
-    HomePage.tsx
-    GalleryPage.tsx
-    RequestPage.tsx
-    QuotePage.tsx
-    OwnerLoginPage.tsx
-    OwnerDashboardPage.tsx
-    NotFoundPage.tsx
-  services/
-    supabaseClient.ts     — Supabase client with env-var guard
-    requestService.ts     — Submit/fetch print requests (stub)
-    materialService.ts    — Fetch materials (stub)
-    galleryService.ts     — Fetch gallery entries (stub)
-    quoteService.ts       — Quote by token (stub)
-    storageService.ts     — STL private storage (stub)
-    stlAnalyzer.ts        — STL file validation + analysis (stub)
-    estimateService.ts    — Rough material cost estimate (mock)
-    paymentService.ts     — Payment actions (stub)
-    notificationService.ts— Email notifications (stub)
-    processingJobService.ts— Processing job CRUD (stub)
-  types/
-    printRequest.ts   — RequestStatus, PaymentStatus, RequestType, PrintRequest
-    materials.ts      — Material type + mock data
-    gallery.ts        — GalleryEntry type + mock data
-    quotes.ts         — Quote type + mock quote
-    family.ts         — FamilyGroup, FamilyMember types + mock data
-    processing.ts     — ProcessingJob, ProcessingJobStatus types
-  utils/              — (reserved for utility functions)
-  styles/
-    global.css        — Global CSS custom properties, reusable utility classes
+```bash
+npm run dev
+npm run build
+npm run lint
+npm run test
+npm run preview
 ```
 
----
-
-## Routes
-
-| Path | Component | Notes |
-|------|-----------|-------|
-| `/` | `HomePage` | Landing page |
-| `/gallery` | `GalleryPage` | Mock gallery |
-| `/request` | `RequestPage` | Quote request form (scaffold) |
-| `/quote/:token` | `QuotePage` | Quote view by token (mock) |
-| `/owner/login` | `OwnerLoginPage` | Mock magic-link login |
-| `/owner` | `OwnerDashboardPage` | Mock dashboard — **must be auth-protected** |
-| `*` | `NotFoundPage` | 404 fallback |
-
----
-
-## Next implementation pass checklist
-
-### Authentication
-- [ ] Implement Supabase Auth magic-link for owner login
-- [ ] Add auth guard component for `/owner` route
-- [ ] Verify owner email server-side before granting dashboard access
-- [ ] Add session refresh / logout
-
-### Database
-- [ ] Design and create Supabase schema (requests, quotes, materials, gallery, family_groups, family_members, processing_jobs)
-- [ ] Enable RLS on all tables with appropriate policies
-- [ ] Replace all mock data with real Supabase queries in service files
-- [ ] Add Supabase Edge Functions for server-side actions (notifications, token validation)
-
-### File upload
-- [ ] Create private `stl` Supabase Storage bucket
-- [ ] Implement `storageService.uploadStlFile()` with type/size validation
-- [ ] Implement `storageService.getSignedStlUrl()` for owner review
-- [ ] Wire Three.js STLLoader in `StlPreview.tsx` for client-side preview
-
-### Request form
-- [ ] Connect form submission to real Supabase insert
-- [ ] Add server-side input validation / rate limiting
-- [ ] Trigger email notification on submission
-
-### Quote workflow
-- [ ] Generate secure random quote tokens (server-side)
-- [ ] Send quote token to requester via email
-- [ ] Validate quote token server-side on `/quote/:token` load
-- [ ] Implement accept/decline with Supabase update
-
-### Payment
-- [ ] Owner pastes payment URL into dashboard (v0.1 manual flow)
-- [ ] Validate payment URL domain on server before sending to requester
-- [ ] (Future) Integrate Stripe or PayPal invoice API via Edge Function
-
-### Processing worker
-- [ ] Design Supabase job queue schema
-- [ ] Implement Raspberry Pi worker to poll and claim jobs
-- [ ] Worker writes slicer results back to Supabase
-- [ ] Frontend reads completed job metadata for display
-
-### GitHub Pages
-- [ ] Add `404.html` (copy of `index.html`) for SPA route fallback
-- [ ] Set up GitHub Actions workflow for automated deployment
-- [ ] Verify all routes work after deployment
-
-### Security review
-- [ ] Audit all RLS policies
-- [ ] Review all TODO security comments in service files
-- [ ] Penetration test quote token endpoint
-- [ ] Validate file uploads server-side before processing
+`npm run test` currently runs TypeScript validation only; no unit test runner is configured yet.

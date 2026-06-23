@@ -1,41 +1,35 @@
-// ─────────────────────────────────────────────
-// Notification Service — scaffold stub
-// ─────────────────────────────────────────────
-// Handles outbound notifications (email) to requesters.
-//
-// TODO (implementation pass):
-//   - Implement via Supabase Edge Function + transactional email provider
-//     (e.g. Resend, SendGrid, Postmark).
-//   - Never send emails directly from the frontend — always route through
-//     a server-side function.
-//   - Templates should be reviewed for content injection risks.
+import { requireSupabase } from "./supabaseClient";
 
-/** Notify a requester that their request was received (stub). */
-export async function notifyRequestReceived(
-  _email: string,
-  _requestTitle: string
-): Promise<void> {
-  // TODO: Call Supabase Edge Function → email provider API
-  console.warn("[notificationService] notifyRequestReceived not implemented.");
+export type NotificationType =
+  | "owner_new_public_quote_request"
+  | "owner_new_family_request"
+  | "owner_quote_accepted"
+  | "owner_quote_declined"
+  | "owner_payment_marked_paid"
+  | "requester_request_received"
+  | "requester_family_request_received"
+  | "requester_quote_sent"
+  | "requester_needs_more_info"
+  | "requester_request_declined"
+  | "requester_job_ready"
+  | "requester_job_completed";
+
+export async function logNotification(type: NotificationType, options: { requestId?: string; quoteId?: string; recipientEmail?: string; recipientRole?: string; payload?: Record<string, unknown> }): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.from("notification_logs").insert({
+    request_id: options.requestId ?? null,
+    quote_id: options.quoteId ?? null,
+    notification_type: type,
+    recipient_email: options.recipientEmail ?? null,
+    recipient_role: options.recipientRole ?? null,
+    status: "queued",
+    payload: options.payload ?? {},
+  });
+  if (error) throw error;
 }
 
-/** Notify a requester that their quote is ready (stub). */
-export async function notifyQuoteReady(
-  _email: string,
-  _quoteToken: string,
-  _requestTitle: string
-): Promise<void> {
-  // TODO: Call Supabase Edge Function → email provider API
-  // Include a quote link: `/quote/${_quoteToken}`
-  console.warn("[notificationService] notifyQuoteReady not implemented.");
-}
-
-/** Notify a requester that more information is needed (stub). */
-export async function notifyNeedsMoreInfo(
-  _email: string,
-  _requestTitle: string,
-  _ownerMessage: string
-): Promise<void> {
-  // TODO: Call Supabase Edge Function → email provider API
-  console.warn("[notificationService] notifyNeedsMoreInfo not implemented.");
+export async function invokeNotificationProcessor(): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.functions.invoke("send-notification-stub", { body: { dryRun: true } });
+  if (error) throw error;
 }

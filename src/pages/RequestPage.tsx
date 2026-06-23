@@ -1,11 +1,11 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import { StlPreview } from "../components/stl/StlPreview";
 import { HelpPopover } from "../components/common/HelpPopover";
-import { fetchMaterials } from "../services/materialService";
-import { estimateMaterialCost } from "../services/estimateService";
+import { estimateMaterialCost, type RoughEstimateResult } from "../services/estimateService";
+import { fetchMaterialVariants } from "../services/materialService";
 import { submitRequest } from "../services/requestService";
-import { validateStlFile } from "../services/stlAnalyzer";
-import type { Material } from "../types/materials";
+import { analyzeStlFile, validateStlFile, type StlAnalysisResult } from "../services/stlAnalyzer";
+import type { MaterialVariant } from "../types/materials";
 import type { InfillType } from "../types/printRequest";
 import "./RequestPage.css";
 
@@ -14,14 +14,14 @@ interface FormState {
   email: string;
   title: string;
   description: string;
-  materialId: string;
-  color: string;
+  materialType: string;
+  materialColorId: string;
   sourceLink: string;
   replyRequested: boolean;
   licensingConfirmed: boolean;
   personalDesign: boolean;
   shippingRequested: boolean;
-  // Advanced
+  shippingNotes: string;
   layerHeight: string;
   infillType: InfillType;
   infillPercent: string;
@@ -33,13 +33,14 @@ const DEFAULT_FORM: FormState = {
   email: "",
   title: "",
   description: "",
-  materialId: "",
-  color: "",
+  materialType: "",
+  materialColorId: "",
   sourceLink: "",
   replyRequested: false,
   licensingConfirmed: false,
   personalDesign: false,
   shippingRequested: false,
+  shippingNotes: "",
   layerHeight: "0.20",
   infillType: "grid",
   infillPercent: "15",
@@ -47,48 +48,49 @@ const DEFAULT_FORM: FormState = {
 };
 
 const INFILL_OPTIONS: { value: InfillType; label: string }[] = [
-  { value: "grid",       label: "Grid" },
-  { value: "gyroid",     label: "Gyroid" },
-  { value: "honeycomb",  label: "Honeycomb" },
-  { value: "triangles",  label: "Triangles" },
-  { value: "cubic",      label: "Cubic" },
-  { value: "lines",      label: "Lines" },
+  { value: "grid", label: "Grid" },
+  { value: "gyroid", label: "Gyroid" },
+  { value: "honeycomb", label: "Honeycomb" },
+  { value: "triangles", label: "Triangles" },
+  { value: "cubic", label: "Cubic" },
+  { value: "lines", label: "Lines" },
 ];
 
 export function RequestPage() {
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [stlFile, setStlFile] = useState<File | undefined>();
+  const [stlAnalysis, setStlAnalysis] = useState<StlAnalysisResult | undefined>();
   const [stlError, setStlError] = useState<string | undefined>();
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [estimate, setEstimate] = useState<{
-    weightGrams: number;
-    cost: number;
-    disclaimer: string;
-    isMock: boolean;
-  } | null>(null);
+  const [materials, setMaterials] = useState<MaterialVariant[]>([]);
+  const [estimate, setEstimate] = useState<RoughEstimateResult | null>(null);
   const [estimating, setEstimating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | undefined>();
 
   useEffect(() => {
-    fetchMaterials().then(setMaterials);
+    fetchMaterialVariants().then(setMaterials).catch((err) => setSubmitError(err instanceof Error ? err.message : "Could not load materials."));
   }, []);
 
-  function handleChange(
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
-  ) {
+  const materialTypes = useMemo(() => Array.from(new Set(materials.map((m) => m.materialType))), [materials]);
+  const filteredColors = form.materialType ? materials.filter((m) => m.materialType === form.materialType) : materials;
+  const selectedMaterial = materials.find((m) => m.id === form.materialColorId);
+
+  function handleChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) {
     const { name, value, type } = e.target;
     setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? (e.target as HTMLInputElement).checked : value,
+      ...(name === "materialType" ? { materialColorId: "" } : {}),
     }));
   }
 
-  function handleStlChange(e: ChangeEvent<HTMLInputElement>) {
+  async function handleStlChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     setStlError(undefined);
+    setStlAnalysis(undefined);
+    setEstimate(null);
     if (!file) {
       setStlFile(undefined);
       return;
@@ -97,33 +99,34 @@ export function RequestPage() {
     if (!validation.valid) {
       setStlError(validation.error);
       setStlFile(undefined);
-    } else {
-      setStlFile(file);
+      return;
+    }
+    setStlFile(file);
+    try {
+      setStlAnalysis(await analyzeStlFile(file));
+    } catch (error) {
+      setStlError(error instanceof Error ? error.message : "Could not parse STL file.");
     }
   }
 
-  async function handleEstimate() {
-    const mat = materials.find((m) => m.id === form.materialId);
-    const costPerGram = mat?.costPerGram ?? 0.02;
+  function readAdvancedSettings() {
+    return {
+      layerHeight: parseFloat(form.layerHeight) || 0.2,
+      infillType: form.infillType,
+      infillPercent: parseInt(form.infillPercent, 10) || 15,
+      wallCount: parseInt(form.wallCount, 10) || 3,
+    };
+  }
+
+  function handleEstimate() {
+    if (!selectedMaterial) {
+      setSubmitError("Choose a material and color before estimating.");
+      return;
+    }
     setEstimating(true);
+    setSubmitError(undefined);
     try {
-      const result = await estimateMaterialCost(
-        costPerGram,
-        advancedMode
-          ? {
-              layerHeight: parseFloat(form.layerHeight) || 0.2,
-              infillType: form.infillType,
-              infillPercent: parseInt(form.infillPercent, 10) || 15,
-              wallCount: parseInt(form.wallCount, 10) || 3,
-            }
-          : undefined
-      );
-      setEstimate({
-        weightGrams: result.estimatedWeightGrams,
-        cost: result.estimatedMaterialCost,
-        disclaimer: result.disclaimer,
-        isMock: result.isMock,
-      });
+      setEstimate(estimateMaterialCost(selectedMaterial, stlAnalysis, advancedMode ? readAdvancedSettings() : undefined));
     } finally {
       setEstimating(false);
     }
@@ -134,37 +137,28 @@ export function RequestPage() {
     setSubmitting(true);
     setSubmitError(undefined);
     try {
+      if (!stlFile) throw new Error("Upload a valid .stl file before submitting.");
+      if (!form.licensingConfirmed) throw new Error("You must confirm licensing/source rights before submitting.");
       const result = await submitRequest({
         requesterName: form.name,
         requesterEmail: form.email,
         title: form.title,
         description: form.description,
-        materialId: form.materialId || undefined,
-        color: form.color || undefined,
+        materialColorId: form.materialColorId || undefined,
         sourceLink: form.sourceLink || undefined,
         replyRequested: form.replyRequested,
         licensingConfirmed: form.licensingConfirmed,
         personalDesign: form.personalDesign,
         shippingRequested: form.shippingRequested,
-        requestType: "public_quote",
-        modelAttached: !!stlFile,
+        shippingNotes: form.shippingNotes || undefined,
         advancedMode,
-        advancedSettings: advancedMode
-          ? {
-              layerHeight: parseFloat(form.layerHeight) || 0.2,
-              infillType: form.infillType,
-              infillPercent: parseInt(form.infillPercent, 10) || 15,
-              wallCount: parseInt(form.wallCount, 10) || 3,
-            }
-          : undefined,
-        roughMaterialEstimate: estimate?.cost,
-        familyGroupId: undefined,
-        stlFileKey: undefined,   // Not uploaded in scaffold
-        // TODO: upload stlFile via storageService.uploadStlFile() in implementation pass
+        advancedSettings: advancedMode ? readAdvancedSettings() : undefined,
+        roughEstimate: estimate ?? undefined,
+        stlFile,
       });
       setSubmitted(result.requestId);
-    } catch {
-      setSubmitError("Submission failed. Please try again.");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -177,20 +171,11 @@ export function RequestPage() {
           <div className="alert alert-success" style={{ marginBottom: "1.5rem" }}>
             <span aria-hidden="true">✅</span>
             <div>
-              <strong>Request received!</strong> (scaffold mock — not persisted)
-              <br />
-              Reference ID: <code className="font-mono">{submitted}</code>
+              <strong>Request received.</strong><br />Reference ID: <code className="font-mono">{submitted}</code>
             </div>
           </div>
-          <p className="text-muted">
-            In the real app, you would receive a confirmation email and the owner
-            would review your request before generating a quote.
-          </p>
-          <button
-            className="btn btn-secondary"
-            style={{ marginTop: "1rem" }}
-            onClick={() => { setSubmitted(null); setForm(DEFAULT_FORM); setEstimate(null); setStlFile(undefined); }}
-          >
+          <p className="text-muted">The owner will review your STL and request details before quoting. No payment is requested at submission time.</p>
+          <button className="btn btn-secondary" style={{ marginTop: "1rem" }} onClick={() => { setSubmitted(null); setForm(DEFAULT_FORM); setEstimate(null); setStlFile(undefined); }}>
             Submit another request
           </button>
         </section>
@@ -201,426 +186,82 @@ export function RequestPage() {
   return (
     <div className="container">
       <section className="section">
-        <div className="scaffold-banner">
-          🏗️ This form is a scaffold placeholder. Submission is mocked and{" "}
-          <strong>does not persist data</strong>. STL upload is not implemented yet.
-        </div>
-
         <h1 className="section-title">Request a Quote</h1>
-        <p className="section-subtitle">
-          Describe your print request below. The owner will review your request,
-          assess printability, and send you a quote. Material estimates shown here
-          are <strong>rough only</strong> — final pricing is set by the owner.
-        </p>
+        <p className="section-subtitle">Upload an STL and describe the print. The owner reviews requests before accepting, quoting, or asking follow-up questions.</p>
 
         <form onSubmit={handleSubmit} className="request-form" noValidate>
-          {/* Contact */}
           <fieldset className="request-fieldset">
             <legend>Your Information</legend>
-
             <div className="grid-2">
-              <div className="form-group">
-                <label className="form-label" htmlFor="req-name">
-                  Name <span className="required">*</span>
-                </label>
-                <input
-                  id="req-name"
-                  name="name"
-                  type="text"
-                  className="form-input"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                  autoComplete="name"
-                  placeholder="Your name"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label" htmlFor="req-email">
-                  Email <span className="required">*</span>
-                </label>
-                <input
-                  id="req-email"
-                  name="email"
-                  type="email"
-                  className="form-input"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
-              </div>
+              <div className="form-group"><label className="form-label" htmlFor="req-name">Name <span className="required">*</span></label><input id="req-name" name="name" className="form-input" value={form.name} onChange={handleChange} required autoComplete="name" /></div>
+              <div className="form-group"><label className="form-label" htmlFor="req-email">Email <span className="required">*</span></label><input id="req-email" name="email" type="email" className="form-input" value={form.email} onChange={handleChange} required autoComplete="email" /></div>
             </div>
           </fieldset>
 
-          {/* Request details */}
           <fieldset className="request-fieldset">
             <legend>Print Request Details</legend>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-title">
-                Request title <span className="required">*</span>
-              </label>
-              <input
-                id="req-title"
-                name="title"
-                type="text"
-                className="form-input"
-                value={form.title}
-                onChange={handleChange}
-                required
-                placeholder="e.g. Articulated dragon, 15 cm wingspan"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-description">
-                Description <span className="required">*</span>
-              </label>
-              <textarea
-                id="req-description"
-                name="description"
-                className="form-textarea"
-                value={form.description}
-                onChange={handleChange}
-                required
-                rows={5}
-                placeholder="Describe your request: intended use, size, any special requirements…"
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="req-source-link">
-                Source / model link{" "}
-                <span className="text-subtle">(optional)</span>
-              </label>
-              <input
-                id="req-source-link"
-                name="sourceLink"
-                type="url"
-                className="form-input"
-                value={form.sourceLink}
-                onChange={handleChange}
-                placeholder="https://www.printables.com/model/..."
-              />
-              <p className="form-hint">Thingiverse, Printables, MakerWorld, etc.</p>
-            </div>
+            <div className="form-group"><label className="form-label" htmlFor="req-title">Request title <span className="required">*</span></label><input id="req-title" name="title" className="form-input" value={form.title} onChange={handleChange} required /></div>
+            <div className="form-group"><label className="form-label" htmlFor="req-description">Description <span className="required">*</span></label><textarea id="req-description" name="description" className="form-textarea" value={form.description} onChange={handleChange} required rows={5} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="req-source-link">Source / model link <span className="text-subtle">(optional)</span></label><input id="req-source-link" name="sourceLink" type="url" className="form-input" value={form.sourceLink} onChange={handleChange} /></div>
           </fieldset>
 
-          {/* Material & color */}
           <fieldset className="request-fieldset">
             <legend>Material &amp; Color</legend>
-            <p className="form-hint" style={{ marginBottom: "1rem" }}>
-              Material cost estimates are rough. The owner will confirm final
-              material selection and pricing.
-            </p>
-
             <div className="grid-2">
               <div className="form-group">
-                <label className="form-label" htmlFor="req-material">
-                  Preferred material
-                </label>
-                <select
-                  id="req-material"
-                  name="materialId"
-                  className="form-select"
-                  value={form.materialId}
-                  onChange={handleChange}
-                >
+                <label className="form-label" htmlFor="req-material">Preferred material</label>
+                <select id="req-material" name="materialType" className="form-select" value={form.materialType} onChange={handleChange}>
                   <option value="">— No preference —</option>
-                  {materials.map((m) => (
-                    <option key={m.id} value={m.id} disabled={!m.inStock}>
-                      {m.name} ({m.filamentType}){!m.inStock ? " — Out of stock" : ""}
-                    </option>
-                  ))}
+                  {materialTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="req-color">
-                  Preferred color
-                </label>
-                <input
-                  id="req-color"
-                  name="color"
-                  type="text"
-                  className="form-input"
-                  value={form.color}
-                  onChange={handleChange}
-                  placeholder="e.g. Matte Black, any blue"
-                />
+                <label className="form-label" htmlFor="req-color">Preferred color</label>
+                <select id="req-color" name="materialColorId" className="form-select" value={form.materialColorId} onChange={handleChange}>
+                  <option value="">— No preference —</option>
+                  {filteredColors.map((m) => <option key={m.id} value={m.id}>{m.colorName}{m.brand ? ` (${m.brand})` : ""}</option>)}
+                </select>
               </div>
             </div>
-
-            {/* Estimate button */}
             <div className="estimate-block">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleEstimate}
-                disabled={estimating}
-              >
-                {estimating ? "Estimating…" : "Estimate material cost"}
-              </button>
-              {estimate && (
-                <div className="estimate-result">
-                  <div className="badge badge-warning" style={{ marginBottom: "0.5rem" }}>
-                    Rough material estimate
-                  </div>
-                  <p>
-                    ≈ <strong>{estimate.weightGrams} g</strong> &nbsp;|&nbsp;
-                    Material cost ≈ <strong>${estimate.cost.toFixed(2)}</strong>
-                  </p>
-                  <p className="text-xs text-muted" style={{ marginTop: "0.25rem" }}>
-                    {estimate.disclaimer}
-                  </p>
-                </div>
-              )}
+              <button type="button" className="btn btn-secondary" onClick={handleEstimate} disabled={estimating || !selectedMaterial}>{estimating ? "Estimating…" : "Estimate material cost"}</button>
+              {estimate && <div className="estimate-result"><div className="badge badge-warning" style={{ marginBottom: "0.5rem" }}>Rough material estimate</div><p>≈ <strong>{estimate.estimatedGrams} g</strong> | Material cost ≈ <strong>${estimate.estimatedMaterialCost.toFixed(2)}</strong></p><p className="text-xs text-muted">{estimate.disclaimer}</p></div>}
             </div>
           </fieldset>
 
-          {/* STL upload */}
           <fieldset className="request-fieldset">
             <legend>STL / Model File</legend>
             <div className="form-group">
-              <label className="form-label" htmlFor="req-stl">
-                Upload STL file{" "}
-                <span className="text-subtle">(optional — .stl or .3mf, max 50 MB)</span>
-              </label>
-              <input
-                id="req-stl"
-                name="stlFile"
-                type="file"
-                accept=".stl,.3mf"
-                className="form-input"
-                onChange={handleStlChange}
-              />
-              {stlError && (
-                <p className="text-error text-sm" role="alert">{stlError}</p>
-              )}
-              <p className="form-hint">
-                STL upload is a placeholder in this scaffold — files are{" "}
-                <strong>not</strong> actually uploaded.
-              </p>
+              <label className="form-label" htmlFor="req-stl">Upload STL file <span className="text-subtle">(.stl only, max 40 MB)</span></label>
+              <input id="req-stl" name="stlFile" type="file" accept=".stl" className="form-input" onChange={handleStlChange} required />
+              {stlError && <p className="text-error text-sm" role="alert">{stlError}</p>}
+              {stlAnalysis?.boundingBoxMm && <p className="form-hint">Bounds: {stlAnalysis.boundingBoxMm.x.toFixed(1)} × {stlAnalysis.boundingBoxMm.y.toFixed(1)} × {stlAnalysis.boundingBoxMm.z.toFixed(1)} mm</p>}
             </div>
             <StlPreview file={stlFile} />
           </fieldset>
 
-          {/* Options */}
           <fieldset className="request-fieldset">
-            <legend>Options &amp; Preferences</legend>
-
-            <div className="form-group">
-              <label className="form-checkbox-group">
-                <input
-                  type="checkbox"
-                  name="replyRequested"
-                  checked={form.replyRequested}
-                  onChange={handleChange}
-                />
-                <span>I would like a reply / questions answered before the quote is finalized</span>
-              </label>
-            </div>
-
-            <div className="form-group">
-              <label className="form-toggle" htmlFor="req-shipping">
-                <span className="toggle-switch">
-                  <input
-                    id="req-shipping"
-                    name="shippingRequested"
-                    type="checkbox"
-                    checked={form.shippingRequested}
-                    onChange={handleChange}
-                  />
-                  <span className="toggle-slider" />
-                </span>
-                <span>Shipping requested</span>
-              </label>
-              <p className="form-hint" style={{ marginLeft: "52px" }}>
-                Leave off if you plan to pick up locally.
-              </p>
-            </div>
+            <legend>Options &amp; Licensing</legend>
+            <label className="form-checkbox-group"><input type="checkbox" name="replyRequested" checked={form.replyRequested} onChange={handleChange} /><span>I would like a reply before the quote is finalized</span></label>
+            <label className="form-checkbox-group"><input type="checkbox" name="licensingConfirmed" checked={form.licensingConfirmed} onChange={handleChange} required /><span>I confirm that this model is licensed for this print or I have the rights to request it.</span></label>
+            <label className="form-checkbox-group"><input type="checkbox" name="personalDesign" checked={form.personalDesign} onChange={handleChange} /><span>This is my own original design</span></label>
+            <label className="form-toggle" htmlFor="req-shipping"><span className="toggle-switch"><input id="req-shipping" name="shippingRequested" type="checkbox" checked={form.shippingRequested} onChange={handleChange} /><span className="toggle-slider" /></span><span>Shipping requested</span></label>
+            {form.shippingRequested && <textarea name="shippingNotes" className="form-textarea" value={form.shippingNotes} onChange={handleChange} rows={3} placeholder="Shipping address/details or questions" />}
           </fieldset>
 
-          {/* Licensing */}
-          <fieldset className="request-fieldset">
-            <legend>Licensing &amp; Source</legend>
-
-            <div className="form-group">
-              <label className="form-checkbox-group">
-                <input
-                  type="checkbox"
-                  name="licensingConfirmed"
-                  checked={form.licensingConfirmed}
-                  onChange={handleChange}
-                />
-                <span>
-                  I confirm that this design is licensed for personal/commercial
-                  printing, or that I have the appropriate rights to have it printed.
-                </span>
-              </label>
-            </div>
-
-            <div className="form-group">
-              <label className="form-checkbox-group">
-                <input
-                  type="checkbox"
-                  name="personalDesign"
-                  checked={form.personalDesign}
-                  onChange={handleChange}
-                />
-                <span>This is my own original design (I created the STL/model myself)</span>
-              </label>
-            </div>
-          </fieldset>
-
-          {/* Advanced mode toggle */}
           <fieldset className="request-fieldset">
             <legend>Advanced Print Settings</legend>
-
-            <div className="form-group">
-              <label className="form-toggle" htmlFor="req-advanced">
-                <span className="toggle-switch">
-                  <input
-                    id="req-advanced"
-                    type="checkbox"
-                    checked={advancedMode}
-                    onChange={(e) => setAdvancedMode(e.target.checked)}
-                  />
-                  <span className="toggle-slider" />
-                </span>
-                <span>Advanced mode</span>
-              </label>
-              <p className="form-hint" style={{ marginLeft: "52px" }}>
-                Specify layer height, infill type/percent, and wall count. Leave
-                off to let the owner choose appropriate defaults.
-              </p>
-            </div>
-
-            {advancedMode && (
-              <div className="advanced-settings-panel">
-                <div className="grid-2">
-                  {/* Layer height */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="req-layer-height">
-                      Layer height (mm){" "}
-                      <HelpPopover label="Layer height">
-                        Controls print resolution and strength. 0.20 mm is a
-                        good all-around default. Lower values (0.12–0.16) give
-                        finer detail but take longer. Higher values (0.28–0.32)
-                        print faster with less detail.
-                      </HelpPopover>
-                    </label>
-                    <select
-                      id="req-layer-height"
-                      name="layerHeight"
-                      className="form-select"
-                      value={form.layerHeight}
-                      onChange={handleChange}
-                    >
-                      <option value="0.12">0.12 mm (fine)</option>
-                      <option value="0.16">0.16 mm</option>
-                      <option value="0.20">0.20 mm (standard)</option>
-                      <option value="0.24">0.24 mm</option>
-                      <option value="0.28">0.28 mm</option>
-                      <option value="0.32">0.32 mm (draft)</option>
-                    </select>
-                  </div>
-
-                  {/* Wall count */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="req-wall-count">
-                      Wall count{" "}
-                      <HelpPopover label="Wall count">
-                        Number of perimeter walls. 2–3 is typical for decorative
-                        prints. 4+ for functional or structural parts. More walls
-                        = stronger part, more filament.
-                      </HelpPopover>
-                    </label>
-                    <input
-                      id="req-wall-count"
-                      name="wallCount"
-                      type="number"
-                      min={1}
-                      max={10}
-                      className="form-input"
-                      value={form.wallCount}
-                      onChange={handleChange}
-                    />
-                  </div>
-
-                  {/* Infill type */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="req-infill-type">
-                      Infill type{" "}
-                      <HelpPopover label="Infill type">
-                        Pattern used to fill the inside of the print. Gyroid is
-                        strong in all directions and works well with flexible
-                        materials. Grid is fast and works for most parts.
-                        Honeycomb balances strength and material use.
-                      </HelpPopover>
-                    </label>
-                    <select
-                      id="req-infill-type"
-                      name="infillType"
-                      className="form-select"
-                      value={form.infillType}
-                      onChange={handleChange}
-                    >
-                      {INFILL_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Infill percent */}
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="req-infill-percent">
-                      Infill % (0–100){" "}
-                      <HelpPopover label="Infill percent">
-                        How dense the interior fill is. 10–20% is typical for
-                        decorative parts. 40–60% for functional parts. 80–100%
-                        for maximum strength (rare, slow, heavy).
-                      </HelpPopover>
-                    </label>
-                    <input
-                      id="req-infill-percent"
-                      name="infillPercent"
-                      type="number"
-                      min={0}
-                      max={100}
-                      className="form-input"
-                      value={form.infillPercent}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
+            <label className="form-toggle" htmlFor="req-advanced"><span className="toggle-switch"><input id="req-advanced" type="checkbox" checked={advancedMode} onChange={(e) => setAdvancedMode(e.target.checked)} /><span className="toggle-slider" /></span><span>Advanced mode</span></label>
+            {advancedMode && <div className="advanced-settings-panel"><div className="grid-2">
+              <div className="form-group"><label className="form-label" htmlFor="req-layer-height">Layer height <HelpPopover label="Layer height">0.20 mm is a good default; lower is finer/slower.</HelpPopover></label><select id="req-layer-height" name="layerHeight" className="form-select" value={form.layerHeight} onChange={handleChange}><option value="0.12">0.12 mm</option><option value="0.16">0.16 mm</option><option value="0.20">0.20 mm</option><option value="0.28">0.28 mm</option></select></div>
+              <div className="form-group"><label className="form-label" htmlFor="req-wall-count">Wall count</label><input id="req-wall-count" name="wallCount" type="number" min={1} max={10} className="form-input" value={form.wallCount} onChange={handleChange} /></div>
+              <div className="form-group"><label className="form-label" htmlFor="req-infill-type">Infill type</label><select id="req-infill-type" name="infillType" className="form-select" value={form.infillType} onChange={handleChange}>{INFILL_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></div>
+              <div className="form-group"><label className="form-label" htmlFor="req-infill-percent">Infill %</label><input id="req-infill-percent" name="infillPercent" type="number" min={0} max={100} className="form-input" value={form.infillPercent} onChange={handleChange} /></div>
+            </div></div>}
           </fieldset>
 
-          {/* Submit */}
-          {submitError && (
-            <div className="alert alert-error" style={{ marginBottom: "1rem" }} role="alert">
-              <span>⚠️</span>
-              <span>{submitError}</span>
-            </div>
-          )}
-
-          <div className="request-submit-row">
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={submitting}
-            >
-              {submitting ? "Submitting…" : "Submit Request"}
-            </button>
-            <p className="text-xs text-muted" style={{ maxWidth: "460px" }}>
-              By submitting, you confirm the licensing statement above. The owner
-              will review your request and send a quote — no payment is requested
-              automatically.
-            </p>
-          </div>
+          {submitError && <div className="alert alert-error" style={{ marginBottom: "1rem" }} role="alert"><span>⚠️</span><span>{submitError}</span></div>}
+          <div className="request-submit-row"><button type="submit" className="btn btn-primary" disabled={submitting}>{submitting ? "Submitting…" : "Submit Request"}</button><p className="text-xs text-muted" style={{ maxWidth: "460px" }}>The owner will review before quoting. Payment is not requested at submission time.</p></div>
         </form>
       </section>
     </div>

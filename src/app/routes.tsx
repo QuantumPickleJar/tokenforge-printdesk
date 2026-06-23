@@ -1,4 +1,5 @@
 import { Routes, Route } from "react-router-dom";
+import { OwnerRoute } from "../components/auth/OwnerRoute";
 import { AppShell } from "../components/layout/AppShell";
 import { HomePage } from "../pages/HomePage";
 import { GalleryPage } from "../pages/GalleryPage";
@@ -17,8 +18,7 @@ export function AppRoutes() {
         <Route path="/request" element={<RequestPage />} />
         <Route path="/quote/:token" element={<QuotePage />} />
         <Route path="/owner/login" element={<OwnerLoginPage />} />
-        {/* TODO (implementation pass): Protect /owner with Supabase Auth guard */}
-        <Route path="/owner" element={<OwnerDashboardPage />} />
+        <Route path="/owner" element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AppShell>
