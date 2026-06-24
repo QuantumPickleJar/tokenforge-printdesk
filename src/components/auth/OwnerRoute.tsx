@@ -41,16 +41,16 @@ export function OwnerRoute({ children }: OwnerRouteProps) {
         <section className="section">
           <div className="alert alert-warning">
             <span>⚠️</span>
-            <span>Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before using owner routes.</span>
+            <span>Supabase is not configured in this build. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY before building or deploying.</span>
           </div>
-          <Link className="btn btn-secondary" to="/owner/login" style={{ marginTop: "1rem" }}>Owner login</Link>
+          <Link className="btn btn-secondary" to="/login?next=/owner" style={{ marginTop: "1rem" }}>Sign in</Link>
         </section>
       </div>
     );
   }
 
   if (state === "blocked") {
-    return <Navigate to="/owner/login" replace />;
+    return <Navigate to="/login?next=/owner" replace />;
   }
 
   return <>{children}</>;
