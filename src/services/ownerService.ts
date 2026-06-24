@@ -1,8 +1,9 @@
 import { requireSupabase } from "./supabaseClient";
+import { signOut } from "./authService";
 
 export interface OwnerMember {
   id: string;
-  userId: string;
+  userId: string | null;
   email: string;
   displayName?: string | null;
   role: "owner" | "admin";
@@ -11,7 +12,7 @@ export interface OwnerMember {
 
 interface OwnerMemberRow {
   id: string;
-  user_id: string;
+  user_id: string | null;
   email: string;
   display_name: string | null;
   role: "owner" | "admin";
@@ -33,28 +34,21 @@ export async function getCurrentOwnerMember(): Promise<OwnerMember | null> {
   const client = requireSupabase();
   const { data: sessionData, error: sessionError } = await client.auth.getSession();
   if (sessionError) throw sessionError;
+
   const user = sessionData.session?.user;
-  if (!user) return null;
+  const userEmail = user?.email?.trim();
+  if (!user || !userEmail) return null;
 
   const { data, error } = await client
     .from("owner_members")
     .select("*")
-    .eq("user_id", user.id)
+    .ilike("email", userEmail)
     .eq("active", true)
     .maybeSingle();
   if (error) throw error;
   return data ? mapOwner(data as OwnerMemberRow) : null;
 }
 
-export async function signInOwnerWithOtp(email: string): Promise<void> {
-  const client = requireSupabase();
-  const redirectTo = `${window.location.origin}${import.meta.env.BASE_URL}owner`;
-  const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-  if (error) throw error;
-}
-
 export async function signOutOwner(): Promise<void> {
-  const client = requireSupabase();
-  const { error } = await client.auth.signOut();
-  if (error) throw error;
+  await signOut();
 }
