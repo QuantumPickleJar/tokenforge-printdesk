@@ -28,8 +28,8 @@ export function AppNav() {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/owner/login" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
-                Owner Login
+              <NavLink to="/login?next=/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
+                Sign in
               </NavLink>
             </li>
           </ul>
