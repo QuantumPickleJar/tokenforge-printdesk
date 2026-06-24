@@ -22,6 +22,19 @@ export function HomePage() {
           <Link to="/gallery" className="btn btn-secondary">
             View Gallery
           </Link>
+          <Link to="/owner/login" className="btn btn-ghost">
+            Owner Login
+          </Link>
+        </div>
+      </section>
+
+      {/* Owner tools */}
+      <section className="section">
+        <div className="alert alert-info">
+          <span aria-hidden="true">🔐</span>
+          <div>
+            <strong>Owner tools:</strong> Use <Link to="/owner/login">Owner Login</Link> to access the admin dashboard. After login, open <Link to="/owner/intake">Generator Intake</Link> to dry-run a Tokenforge Generator JSON handoff into the owner queue.
+          </div>
         </div>
       </section>
 
