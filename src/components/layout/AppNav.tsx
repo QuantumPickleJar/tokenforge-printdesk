@@ -1,7 +1,29 @@
+import { useEffect, useState } from "react";
 import { NavLink, Link } from "react-router-dom";
+import { supabase } from "../../services/supabaseClient";
 import "./AppNav.css";
 
 export function AppNav() {
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSignedIn(Boolean(data.session));
+    });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSignedIn(Boolean(session));
+    });
+
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <header className="app-nav" role="banner">
       <div className="container app-nav__inner">
@@ -28,9 +50,15 @@ export function AppNav() {
               </NavLink>
             </li>
             <li>
-              <NavLink to="/login?next=/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
-                Sign in
-              </NavLink>
+              {signedIn ? (
+                <NavLink to="/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
+                  Owner
+                </NavLink>
+              ) : (
+                <NavLink to="/login?next=/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
+                  Sign in
+                </NavLink>
+              )}
             </li>
           </ul>
         </nav>
