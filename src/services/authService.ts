@@ -7,10 +7,16 @@ function toRelativePath(path: string): string {
   return path;
 }
 
+function buildHashRouterRedirect(path: string): string {
+  const relativePath = toRelativePath(path);
+  const appRoot = new URL(import.meta.env.BASE_URL, window.location.origin);
+  appRoot.hash = relativePath;
+  return appRoot.toString();
+}
+
 export async function signInWithMagicLink(email: string, redirectPath = "/"): Promise<void> {
   const client = requireSupabase();
-  const relativePath = toRelativePath(redirectPath);
-  const redirectTo = new URL(`${import.meta.env.BASE_URL}${relativePath.slice(1)}`, window.location.origin).toString();
+  const redirectTo = buildHashRouterRedirect(redirectPath);
   const { error } = await client.auth.signInWithOtp({
     email,
     options: { emailRedirectTo: redirectTo },
