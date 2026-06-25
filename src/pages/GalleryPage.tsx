@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchPublishedGallery } from "../services/galleryService";
-import type { GalleryEntry } from "../types/gallery";
+import type { GalleryEntry, GalleryImage } from "../types/gallery";
 import "./GalleryPage.css";
 
 export function GalleryPage() {
@@ -39,20 +39,62 @@ export function GalleryPage() {
   );
 }
 
+function uniqueImages(entry: GalleryEntry): GalleryImage[] {
+  const imageMap = new Map<string, GalleryImage>();
+
+  for (const image of entry.images ?? []) {
+    const url = image.publicUrl || image.storagePath;
+    if (url) imageMap.set(url, image);
+  }
+
+  if (entry.imageUrl && !imageMap.has(entry.imageUrl)) {
+    imageMap.set(entry.imageUrl, {
+      id: `${entry.id}-primary-image`,
+      galleryItemId: entry.id,
+      storagePath: entry.imageUrl,
+      publicUrl: entry.imageUrl,
+      altText: entry.title,
+      sortOrder: 0,
+    });
+  }
+
+  return Array.from(imageMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 function GalleryCard({ entry }: { entry: GalleryEntry }) {
+  const images = useMemo(() => uniqueImages(entry), [entry]);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const activeImage = images[activeImageIndex];
   const printDate = new Date(entry.printedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
 
+  function previousImage() {
+    setActiveImageIndex((index) => (index - 1 + images.length) % images.length);
+  }
+
+  function nextImage() {
+    setActiveImageIndex((index) => (index + 1) % images.length);
+  }
+
   return (
     <article className="card gallery-card">
-      {entry.imageUrl ? (
-        <img src={entry.imageUrl} alt={entry.title} className="gallery-card__image" loading="lazy" />
-      ) : (
-        <div className="gallery-card__image-placeholder" aria-hidden="true"><span>⬡</span></div>
-      )}
+      <div className="gallery-card__media">
+        {activeImage?.publicUrl ? (
+          <img src={activeImage.publicUrl} alt={activeImage.altText || entry.title} className="gallery-card__image" loading="lazy" />
+        ) : (
+          <div className="gallery-card__image-placeholder" aria-hidden="true"><span>⬡</span></div>
+        )}
+        {images.length > 1 && (
+          <div className="gallery-card__carousel" aria-label={`Images for ${entry.title}`}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={previousImage}>Previous</button>
+            <span className="text-xs text-muted">{activeImageIndex + 1} / {images.length}</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={nextImage}>Next</button>
+          </div>
+        )}
+      </div>
       <div className="gallery-card__body">
         <h2 className="gallery-card__title">{entry.title}</h2>
         {entry.description && <p className="gallery-card__desc text-muted">{entry.description}</p>}
