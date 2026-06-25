@@ -25,8 +25,8 @@ const TABS: { id: DashTab; label: string }[] = [
   { id: "settings", label: "Settings" },
 ];
 
-export function OwnerDashboardPage() {
-  const [tab, setTab] = useState<DashTab>("queue");
+export function OwnerDashboardPage({ initialTab = "queue" }: { initialTab?: DashTab }) {
+  const [tab, setTab] = useState<DashTab>(initialTab);
   const [requests, setRequests] = useState<PrintRequest[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [colors, setColors] = useState<MaterialColor[]>([]);
@@ -50,6 +50,10 @@ export function OwnerDashboardPage() {
     setGroups(groupRows);
     setMembers(memberRows);
   }
+
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   useEffect(() => {
     let cancelled = false;
