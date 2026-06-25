@@ -1,4 +1,4 @@
-export type MaterialType = "PLA" | "PETG";
+export type MaterialType = string;
 
 export interface Material {
   id: string;
