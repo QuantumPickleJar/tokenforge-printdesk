@@ -49,17 +49,26 @@ export function AppNav() {
                 Request
               </NavLink>
             </li>
-            <li>
-              {signedIn ? (
-                <NavLink to="/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
-                  Owner
-                </NavLink>
-              ) : (
+            {signedIn ? (
+              <>
+                <li>
+                  <NavLink to="/owner/materials" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
+                    Materials
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
+                    Owner
+                  </NavLink>
+                </li>
+              </>
+            ) : (
+              <li>
                 <NavLink to="/login?next=/owner" className={({ isActive }) => isActive ? "nav-link nav-link-owner active" : "nav-link nav-link-owner"}>
                   Sign in
                 </NavLink>
-              )}
-            </li>
+              </li>
+            )}
           </ul>
         </nav>
       </div>
