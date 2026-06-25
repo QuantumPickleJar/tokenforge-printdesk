@@ -3,6 +3,8 @@ import { NavLink, Link } from "react-router-dom";
 import { supabase } from "../../services/supabaseClient";
 import "./AppNav.css";
 
+const GENERATOR_URL = "https://github.com/QuantumPickleJar/tokenforge-generator";
+
 export function AppNav() {
   const [signedIn, setSignedIn] = useState(false);
 
@@ -48,6 +50,11 @@ export function AppNav() {
               <NavLink to="/request" className={({ isActive }) => isActive ? "nav-link active" : "nav-link"}>
                 Request
               </NavLink>
+            </li>
+            <li>
+              <a href={GENERATOR_URL} className="nav-link" target="_blank" rel="noopener noreferrer">
+                Generator
+              </a>
             </li>
             {signedIn ? (
               <>
