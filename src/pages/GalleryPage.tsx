@@ -64,12 +64,16 @@ function uniqueImages(entry: GalleryEntry): GalleryImage[] {
 function GalleryCard({ entry }: { entry: GalleryEntry }) {
   const images = useMemo(() => uniqueImages(entry), [entry]);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
-  const activeImage = images[activeImageIndex];
+  const activeImage = images[activeImageIndex] ?? images[0];
   const printDate = new Date(entry.printedAt).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [entry.id, images.length]);
 
   function previousImage() {
     setActiveImageIndex((index) => (index - 1 + images.length) % images.length);
@@ -88,11 +92,31 @@ function GalleryCard({ entry }: { entry: GalleryEntry }) {
           <div className="gallery-card__image-placeholder" aria-hidden="true"><span>⬡</span></div>
         )}
         {images.length > 1 && (
-          <div className="gallery-card__carousel" aria-label={`Images for ${entry.title}`}>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={previousImage}>Previous</button>
-            <span className="text-xs text-muted">{activeImageIndex + 1} / {images.length}</span>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={nextImage}>Next</button>
-          </div>
+          <>
+            <div className="gallery-card__carousel" aria-label={`Images for ${entry.title}`}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={previousImage}>Previous</button>
+              <span className="text-xs text-muted">{activeImageIndex + 1} / {images.length}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={nextImage}>Next</button>
+            </div>
+            <div className="gallery-card__thumbnails" aria-label={`Choose image for ${entry.title}`}>
+              {images.map((image, index) => (
+                <button
+                  key={image.id || `${entry.id}-image-${index}`}
+                  type="button"
+                  className={index === activeImageIndex ? "gallery-card__thumbnail is-active" : "gallery-card__thumbnail"}
+                  onClick={() => setActiveImageIndex(index)}
+                  aria-label={`Show image ${index + 1} of ${images.length} for ${entry.title}`}
+                  aria-pressed={index === activeImageIndex}
+                >
+                  {image.publicUrl ? (
+                    <img src={image.publicUrl} alt="" loading="lazy" />
+                  ) : (
+                    <span aria-hidden="true">⬡</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </>
         )}
       </div>
       <div className="gallery-card__body">
