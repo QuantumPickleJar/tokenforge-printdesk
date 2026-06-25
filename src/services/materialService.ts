@@ -10,6 +10,8 @@ import {
   type MaterialType,
 } from "../types/materials";
 
+const PUBLIC_MATERIALS_URL = `${import.meta.env.BASE_URL}data/materials.json`;
+
 type MaterialRow = {
   id: string;
   name: string;
@@ -31,6 +33,32 @@ type ColorRow = {
   print_notes: string | null;
   sort_order: number;
   materials?: MaterialRow;
+};
+
+type PublicMaterialColor = {
+  id?: string;
+  colorName?: string;
+  brand?: string | null;
+  hexColor?: string | null;
+  active?: boolean;
+  printNotes?: string | null;
+  sortOrder?: number;
+};
+
+type PublicMaterial = {
+  id?: string;
+  name?: string;
+  materialType?: string;
+  densityGcm3?: number;
+  costPerKg?: number;
+  active?: boolean;
+  printNotes?: string | null;
+  sortOrder?: number;
+  colors?: PublicMaterialColor[];
+};
+
+type PublicMaterialPayload = {
+  materials?: PublicMaterial[];
 };
 
 function mapMaterial(row: MaterialRow): Material {
@@ -59,22 +87,71 @@ function mapColor(row: ColorRow): MaterialColor {
   };
 }
 
+async function fetchPublicMaterialVariants(): Promise<MaterialVariant[]> {
+  try {
+    const response = await fetch(PUBLIC_MATERIALS_URL, { cache: "no-store" });
+    if (!response.ok) throw new Error(`Material pricing JSON returned ${response.status}.`);
+    const payload = await response.json() as PublicMaterialPayload;
+    const variants: MaterialVariant[] = [];
+
+    for (const rawMaterial of payload.materials ?? []) {
+      if (rawMaterial.active === false) continue;
+      const material: Material = {
+        id: rawMaterial.id || rawMaterial.name || "material",
+        name: rawMaterial.name || rawMaterial.materialType || "Material",
+        materialType: rawMaterial.materialType || rawMaterial.name || "Material",
+        densityGcm3: Number(rawMaterial.densityGcm3 || 1.24),
+        costPerKg: Number(rawMaterial.costPerKg || 0),
+        active: rawMaterial.active ?? true,
+        printNotes: rawMaterial.printNotes ?? null,
+        sortOrder: rawMaterial.sortOrder ?? 0,
+      };
+
+      for (const rawColor of rawMaterial.colors ?? []) {
+        if (rawColor.active === false) continue;
+        variants.push(makeMaterialVariant(material, {
+          id: rawColor.id || `${material.id}-${rawColor.colorName || "color"}`,
+          materialId: material.id,
+          colorName: rawColor.colorName || "Unspecified color",
+          brand: rawColor.brand ?? null,
+          hexColor: rawColor.hexColor ?? null,
+          active: rawColor.active ?? true,
+          printNotes: rawColor.printNotes ?? null,
+          sortOrder: rawColor.sortOrder ?? 0,
+        }));
+      }
+    }
+
+    return variants.length
+      ? variants.sort((a, b) => a.sortOrder - b.sortOrder)
+      : FALLBACK_MATERIAL_VARIANTS;
+  } catch {
+    return FALLBACK_MATERIAL_VARIANTS;
+  }
+}
+
 export async function fetchMaterialVariants(): Promise<MaterialVariant[]> {
-  if (!supabase) return FALLBACK_MATERIAL_VARIANTS;
+  if (!supabase) return fetchPublicMaterialVariants();
 
-  const { data, error } = await supabase
-    .from("material_colors")
-    .select("id, material_id, color_name, brand, hex_color, active, print_notes, sort_order, materials!inner(id, name, material_type, density_g_cm3, cost_per_kg, active, print_notes, sort_order)")
-    .eq("active", true)
-    .eq("materials.active", true)
-    .order("sort_order", { ascending: true });
+  try {
+    const { data, error } = await supabase
+      .from("material_colors")
+      .select("id, material_id, color_name, brand, hex_color, active, print_notes, sort_order, materials!inner(id, name, material_type, density_g_cm3, cost_per_kg, active, print_notes, sort_order)")
+      .eq("active", true)
+      .eq("materials.active", true)
+      .order("sort_order", { ascending: true });
 
-  if (error) throw error;
+    if (error) throw error;
 
-  return ((data ?? []) as unknown as ColorRow[]).map((row) => {
-    const material = mapMaterial(row.materials as MaterialRow);
-    return makeMaterialVariant(material, mapColor(row));
-  });
+    const variants = ((data ?? []) as unknown as ColorRow[]).map((row) => {
+      const material = mapMaterial(row.materials as MaterialRow);
+      return makeMaterialVariant(material, mapColor(row));
+    });
+
+    return variants.length ? variants : fetchPublicMaterialVariants();
+  } catch {
+    return fetchPublicMaterialVariants();
+  }
 }
 
 export async function fetchMaterials(): Promise<Material[]> {
