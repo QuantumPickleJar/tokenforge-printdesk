@@ -44,15 +44,24 @@
   justify-content: space-between;
   gap: 0.5rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+  background: transparent;
+  box-shadow: none;
   padding: 0.35rem;
-  backdrop-filter: blur(6px);
+  backdrop-filter: none;
 }
 
 .gallery-card__carousel .btn {
   min-height: 32px;
   padding: 0.25rem 0.6rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+}
+
+.gallery-card__carousel .text-xs {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
 }
 
 .gallery-card__thumbnails {
