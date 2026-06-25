@@ -21,6 +21,7 @@ export function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/owner/login" element={<Navigate to="/login?next=/owner" replace />} />
         <Route path="/owner" element={<OwnerRoute><OwnerDashboardPage /></OwnerRoute>} />
+        <Route path="/owner/materials" element={<OwnerRoute><OwnerDashboardPage initialTab="materials" /></OwnerRoute>} />
         <Route path="/owner/intake" element={<OwnerIntakePage />} />
         <Route path="/generator" element={<Navigate to="/owner/intake" replace />} />
         <Route path="*" element={<NotFoundPage />} />
