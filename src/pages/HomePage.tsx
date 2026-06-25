@@ -1,12 +1,13 @@
 import { Link } from "react-router-dom";
 import "./HomePage.css";
 
+const GENERATOR_URL = "https://github.com/QuantumPickleJar/tokenforge-generator";
+
 export function HomePage() {
   return (
     <div className="container">
       {/* Hero */}
       <section className="home-hero section">
-        <div className="home-hero__badge badge badge-primary">v0.1 Scaffold</div>
         <h1 className="home-hero__title">
           TokenForge <span className="text-primary">PrintDesk</span>
         </h1>
@@ -22,6 +23,9 @@ export function HomePage() {
           <Link to="/gallery" className="btn btn-secondary">
             View Gallery
           </Link>
+          <a href={GENERATOR_URL} className="btn btn-ghost" target="_blank" rel="noopener noreferrer">
+            TokenForge Generator
+          </a>
           <Link to="/owner/login" className="btn btn-ghost">
             Owner Login
           </Link>
@@ -33,7 +37,7 @@ export function HomePage() {
         <div className="alert alert-info">
           <span aria-hidden="true">🔐</span>
           <div>
-            <strong>Owner tools:</strong> Use <Link to="/owner/login">Owner Login</Link> to access the admin dashboard. After login, open <Link to="/owner/intake">Generator Intake</Link> to dry-run a Tokenforge Generator JSON handoff into the owner queue.
+            <strong>Owner tools:</strong> Use <Link to="/owner/login">Owner Login</Link> to access the admin dashboard. After login, open <Link to="/owner/intake">Generator Intake</Link> to review TokenForge Generator JSON handoffs in the owner queue.
           </div>
         </div>
       </section>
@@ -50,7 +54,7 @@ export function HomePage() {
             <h3>Submit a request</h3>
             <p>
               Fill out the form with your design details, material preference,
-              and upload an STL file. Include as much context as you can.
+              and model source. Include as much context as you can.
             </p>
           </div>
           <div className="card home-step-card">
@@ -66,8 +70,8 @@ export function HomePage() {
             <div className="home-step-card__number">3</div>
             <h3>Approve &amp; coordinate</h3>
             <p>
-              You receive a quote link. Accept it, arrange payment (via the
-              provided link), and coordinate pickup or shipping with the owner.
+              You receive a quote link. Accept it, arrange payment through the
+              provided instructions, and coordinate pickup or shipping with the owner.
             </p>
           </div>
         </div>
@@ -83,7 +87,7 @@ export function HomePage() {
               <li>✅ Owner-reviewed queue and status tracking</li>
               <li>✅ Material and color selection</li>
               <li>✅ Family / trusted requester workflow</li>
-              <li>✅ STL file upload (coming in implementation pass)</li>
+              <li>✅ STL upload and model-link request intake</li>
             </ul>
           </div>
           <div className="card">
@@ -91,22 +95,9 @@ export function HomePage() {
               <li>✅ Public gallery of completed prints</li>
               <li>✅ Secure quote token delivery</li>
               <li>✅ Rough material cost estimate</li>
+              <li>✅ Supabase-backed request storage</li>
               <li>🔜 Raspberry Pi / TokenForge local processing</li>
-              <li>🔜 Supabase-backed persistent storage</li>
             </ul>
-          </div>
-        </div>
-      </section>
-
-      {/* Disclaimer */}
-      <section className="section">
-        <div className="alert alert-info">
-          <span aria-hidden="true">ℹ️</span>
-          <div>
-            <strong>Scaffold notice:</strong> This is v0.1 — a structural
-            scaffold. Some features use mock data. Supabase integration,
-            real STL upload, and production auth are deferred to the next
-            implementation pass. See the README for details.
           </div>
         </div>
       </section>
