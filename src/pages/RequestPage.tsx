@@ -59,6 +59,86 @@ const INFILL_OPTIONS: { value: InfillType; label: string }[] = [
   { value: "lines", label: "Lines" },
 ];
 
+const GALLERY_HANDOFF_SCHEMA = "tokenforge.printdesk.gallery-handoff.v1";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readString(source: unknown, key: string): string {
+  if (!isRecord(source)) return "";
+  const value = source[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function readNumber(source: unknown, key: string): number | null {
+  if (!isRecord(source)) return null;
+  const value = source[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function decodeUrlSafeBase64Json(value: string): unknown {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function formatLayerHeight(value: number | null): string | null {
+  if (value === null) return null;
+  const rounded = Math.round(value * 100) / 100;
+  const allowed = [0.12, 0.16, 0.2, 0.28];
+  const match = allowed.find((option) => Math.abs(option - rounded) < 0.001);
+  return match ? match.toFixed(2) : null;
+}
+
+function readGalleryHandoffPreset(): { form: Partial<FormState>; advancedMode: boolean } | null {
+  const encoded = new URLSearchParams(window.location.search).get("handoff");
+  if (!encoded) return null;
+
+  const payload = decodeUrlSafeBase64Json(encoded);
+  if (!isRecord(payload) || readString(payload, "schema") !== GALLERY_HANDOFF_SCHEMA) return null;
+
+  const item = isRecord(payload.item) ? payload.item : {};
+  const print = isRecord(payload.print) ? payload.print : {};
+  const source = isRecord(payload.source) ? payload.source : {};
+  const title = readString(item, "name") || "Portfolio gallery print";
+  const description = readString(item, "description");
+  const galleryUrl = readString(item, "galleryUrl") || readString(source, "galleryUrl");
+  const imageUrl = readString(item, "imageUrl");
+  const modelUrl = readString(item, "modelUrl");
+  const previewUrl = readString(item, "previewUrl");
+  const material = readString(print, "material");
+  const printNotes = readString(print, "notes");
+  const layerHeight = formatLayerHeight(readNumber(print, "layerHeightMm"));
+  const sourceLink = modelUrl || galleryUrl || previewUrl || imageUrl;
+  const descriptionParts = [
+    description,
+    material ? `Preferred material from gallery: ${material}` : "",
+    printNotes ? `Gallery notes: ${printNotes}` : "",
+    galleryUrl ? `Portfolio gallery item: ${galleryUrl}` : "",
+    imageUrl ? `Reference image: ${imageUrl}` : "",
+  ].filter(Boolean);
+
+  return {
+    advancedMode: Boolean(layerHeight),
+    form: {
+      title,
+      description: descriptionParts.join("\n\n"),
+      materialType: material,
+      sourceMode: "link",
+      sourceLink,
+      layerHeight: layerHeight ?? DEFAULT_FORM.layerHeight,
+    },
+  };
+}
+
 function isValidHttpUrl(value: string) {
   try {
     const url = new URL(value);
@@ -80,12 +160,26 @@ export function RequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | undefined>();
+  const [handoffNotice, setHandoffNotice] = useState<string | null>(null);
   const supabaseReady = isSupabaseConfigured();
 
   useEffect(() => {
     fetchMaterialVariants()
       .then(setMaterials)
       .catch((err) => setSubmitError(err instanceof Error ? err.message : "Could not load materials."));
+  }, []);
+
+  useEffect(() => {
+    try {
+      const preset = readGalleryHandoffPreset();
+      if (!preset) return;
+      setForm((prev) => ({ ...prev, ...preset.form }));
+      if (preset.advancedMode) setAdvancedMode(true);
+      setHandoffNotice("Loaded this form from the portfolio gallery. Add your contact details, confirm licensing, then submit when ready.");
+    } catch (error) {
+      setHandoffNotice(null);
+      setSubmitError(error instanceof Error ? `Could not read gallery handoff: ${error.message}` : "Could not read gallery handoff.");
+    }
   }, []);
 
   const materialTypes = useMemo(() => Array.from(new Set(materials.map((m) => m.materialType))), [materials]);
@@ -180,6 +274,7 @@ export function RequestPage() {
     setStlAnalysis(undefined);
     setStlError(undefined);
     setAdvancedMode(false);
+    setHandoffNotice(null);
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -243,6 +338,13 @@ export function RequestPage() {
         <h1 className="section-title">Request a Quote</h1>
         <p className="section-subtitle">Paste a model URL or upload an STL, then describe the print. The owner reviews requests before accepting, quoting, or asking follow-up questions.</p>
 
+        {handoffNotice && (
+          <div className="alert alert-success" style={{ marginBottom: "1.5rem" }}>
+            <span>✅</span>
+            <span>{handoffNotice}</span>
+          </div>
+        )}
+
         {!supabaseReady && (
           <div className="alert alert-warning" style={{ marginBottom: "1.5rem" }}>
             <span>⚠️</span>
@@ -280,7 +382,7 @@ export function RequestPage() {
               <div className="form-group">
                 <label className="form-label" htmlFor="req-source-link">Model URL <span className="required">*</span></label>
                 <input id="req-source-link" name="sourceLink" type="url" className="form-input" value={form.sourceLink} onChange={handleChange} placeholder="https://www.printables.com/model/..." required />
-                <p className="form-hint">Use a public model page or download link. The owner will inspect the model before accepting or quoting.</p>
+                <p className="form-hint">Use a public model page, gallery reference, or download link. The owner will inspect the model before accepting or quoting.</p>
               </div>
             ) : (
               <div className="form-group">
@@ -303,6 +405,7 @@ export function RequestPage() {
                 <label className="form-label" htmlFor="req-material">Preferred material</label>
                 <select id="req-material" name="materialType" className="form-select" value={form.materialType} onChange={handleChange}>
                   <option value="">— No preference —</option>
+                  {form.materialType && !materialTypes.includes(form.materialType) && <option value={form.materialType}>{form.materialType}</option>}
                   {materialTypes.map((type) => <option key={type} value={type}>{type}</option>)}
                 </select>
               </div>
