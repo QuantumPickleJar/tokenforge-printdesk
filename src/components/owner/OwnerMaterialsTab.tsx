@@ -2,7 +2,11 @@ import type { FormEvent } from "react";
 import { setMaterialColorActive, upsertMaterial, upsertMaterialColor } from "../../services/materialService";
 import type { Material, MaterialColor, MaterialType } from "../../types/materials";
 
+const COMMON_MATERIAL_TYPES = ["PLA", "PLA+", "PETG", "TPU", "ABS", "ASA", "Wood PLA", "Silk PLA"];
+
 export function OwnerMaterialsTab({ materials, colors, reload }: { materials: Material[]; colors: MaterialColor[]; reload: () => Promise<void> }) {
+  const materialTypes = Array.from(new Set([...COMMON_MATERIAL_TYPES, ...materials.map((material) => material.materialType)])).filter(Boolean);
+
   async function createMaterial(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
@@ -39,7 +43,10 @@ export function OwnerMaterialsTab({ materials, colors, reload }: { materials: Ma
         <h2 className="card-title">Materials</h2>
         <form onSubmit={createMaterial} className="request-form">
           <input name="name" className="form-input" placeholder="Material name" required />
-          <select name="type" className="form-select"><option value="PLA">PLA</option><option value="PETG">PETG</option></select>
+          <input name="type" className="form-input" placeholder="Material type, e.g. PLA, PETG, TPU" list="material-type-options" required />
+          <datalist id="material-type-options">
+            {materialTypes.map((type) => <option key={type} value={type} />)}
+          </datalist>
           <input name="density" className="form-input" type="number" step="0.001" placeholder="Density g/cm³" required />
           <input name="cost" className="form-input" type="number" step="0.01" placeholder="Cost per kg" required />
           <input name="notes" className="form-input" placeholder="Print notes" />
