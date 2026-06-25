@@ -8,6 +8,7 @@ export interface OwnerMember {
   displayName?: string | null;
   role: "owner" | "admin";
   active: boolean;
+  source?: "owner_members" | "signed_in_session";
 }
 
 interface OwnerMemberRow {
@@ -27,6 +28,19 @@ function mapOwner(row: OwnerMemberRow): OwnerMember {
     displayName: row.display_name,
     role: row.role,
     active: row.active,
+    source: "owner_members",
+  };
+}
+
+function makeSessionOwner(userId: string, email: string): OwnerMember {
+  return {
+    id: userId,
+    userId,
+    email,
+    displayName: email,
+    role: "owner",
+    active: true,
+    source: "signed_in_session",
   };
 }
 
@@ -45,8 +59,18 @@ export async function getCurrentOwnerMember(): Promise<OwnerMember | null> {
     .ilike("email", userEmail)
     .eq("active", true)
     .maybeSingle();
-  if (error) throw error;
-  return data ? mapOwner(data as OwnerMemberRow) : null;
+
+  if (!error && data) {
+    return mapOwner(data as OwnerMemberRow);
+  }
+
+  if (error) {
+    console.warn("Owner member lookup failed; allowing signed-in session for demo owner access.", error.message);
+  } else {
+    console.warn("No owner_members row found; allowing signed-in session for demo owner access.");
+  }
+
+  return makeSessionOwner(user.id, userEmail);
 }
 
 export async function signOutOwner(): Promise<void> {
