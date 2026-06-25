@@ -1,0 +1,56 @@
+{
+  "schema": "tokenforge.printdesk.material-pricing.v1",
+  "updatedAt": "2026-06-25T00:00:00.000Z",
+  "currency": "USD",
+  "notes": "Public fallback/demo material pricing. Owner-managed Supabase material inventory overrides this when configured.",
+  "materials": [
+    {
+      "id": "generic-pla",
+      "name": "Generic PLA",
+      "materialType": "PLA",
+      "densityGcm3": 1.24,
+      "costPerKg": 22,
+      "active": true,
+      "printNotes": "General fallback PLA pricing for public demo estimates.",
+      "sortOrder": 10,
+      "colors": [
+        {
+          "id": "generic-pla-black",
+          "colorName": "Black",
+          "brand": "Generic",
+          "hexColor": "#1f1f1f",
+          "active": true,
+          "sortOrder": 10
+        },
+        {
+          "id": "generic-pla-white",
+          "colorName": "White",
+          "brand": "Generic",
+          "hexColor": "#f3f3f3",
+          "active": true,
+          "sortOrder": 20
+        }
+      ]
+    },
+    {
+      "id": "generic-petg",
+      "name": "Generic PETG",
+      "materialType": "PETG",
+      "densityGcm3": 1.27,
+      "costPerKg": 26,
+      "active": true,
+      "printNotes": "General fallback PETG pricing for public demo estimates.",
+      "sortOrder": 20,
+      "colors": [
+        {
+          "id": "generic-petg-translucent-blue",
+          "colorName": "Translucent Blue",
+          "brand": "Generic",
+          "hexColor": "#5b8de0",
+          "active": true,
+          "sortOrder": 10
+        }
+      ]
+    }
+  ]
+}
