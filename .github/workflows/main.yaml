@@ -39,6 +39,22 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Generate runtime Supabase config
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+
+          const config = {
+            VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? '',
+            VITE_SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY ?? '',
+          };
+
+          writeFileSync('public/env.js', `window.__TOKENFORGE_CONFIG__ = ${JSON.stringify(config)};\n`);
+          NODE
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Build Vite app
         run: npm run build
         env:
