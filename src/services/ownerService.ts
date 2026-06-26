@@ -1,5 +1,6 @@
-import { requireSupabase } from "./supabaseClient";
+import { requireSupabase, isSupabaseConfigured } from "./supabaseClient";
 import { signOut } from "./authService";
+import { isLocalOwnerUnlockConfigured, lockLocalOwner } from "./localOwnerAuthService";
 
 export interface OwnerMember {
   id: string;
@@ -74,5 +75,15 @@ export async function getCurrentOwnerMember(): Promise<OwnerMember | null> {
 }
 
 export async function signOutOwner(): Promise<void> {
-  await signOut();
+  if (isSupabaseConfigured()) {
+    await signOut();
+  }
+
+  if (isLocalOwnerUnlockConfigured()) {
+    try {
+      await lockLocalOwner();
+    } catch (error) {
+      console.warn("Could not lock local owner access during sign out.", error);
+    }
+  }
 }
