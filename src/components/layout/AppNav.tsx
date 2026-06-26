@@ -3,7 +3,7 @@ import { NavLink, Link } from "react-router-dom";
 import { supabase } from "../../services/supabaseClient";
 import "./AppNav.css";
 
-const GENERATOR_URL = "https://github.com/QuantumPickleJar/tokenforge-generator";
+const GENERATOR_URL = "https://quantumpicklejar.github.io/tokenforge-generator/";
 
 export function AppNav() {
   const [signedIn, setSignedIn] = useState(false);
