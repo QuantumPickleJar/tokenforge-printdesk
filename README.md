@@ -34,6 +34,36 @@ VITE_SUPABASE_ANON_KEY=
 
 `.env.local` must not be committed. The frontend may only use the Supabase anon/publishable key. Service-role keys and provider secrets belong only in Supabase Edge Functions or local secure configuration.
 
+## Local owner unlock for demos
+
+Supabase Auth remains the production owner authentication path. For trusted local/Tailnet development, PrintDesk can also check a Pi-hosted local owner unlock endpoint from `printdesk-gallery-auth` so repeated owner testing does not burn Supabase magic-link sends.
+
+Tailnet HTTPS is the preferred mode. Expose the Pi service with Tailscale Serve on a non-root HTTPS port so it does not collide with other Tailnet services:
+
+```bash
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:5175
+tailscale serve status
+```
+
+Then set PrintDesk `.env.local`:
+
+```env
+VITE_ENABLE_LOCAL_OWNER_UNLOCK=true
+VITE_LOCAL_OWNER_AUTH_URL=https://<pi-full-tailnet-name>:8443
+```
+
+The matching Pi `.env` in `printdesk-gallery-auth` should allow the PrintDesk origin and use cross-site secure cookies for Tailnet HTTPS:
+
+```env
+LOCAL_OWNER_ALLOWED_ORIGINS=https://<desktop-full-tailnet-name>,http://localhost:5173,http://127.0.0.1:5173
+SESSION_COOKIE_SAMESITE=None
+SESSION_COOKIE_SECURE=true
+```
+
+For local-only HTTP testing, leave `SESSION_COOKIE_SAMESITE=Lax` and `SESSION_COOKIE_SECURE=false`, then use an HTTP `VITE_LOCAL_OWNER_AUTH_URL` such as `http://192.168.0.149:5175`.
+
+The local unlock password is never stored in browser storage. It is posted to the Pi only for the unlock request, and subsequent owner checks use the Pi service's HttpOnly session cookie.
+
 ## Supabase setup
 
 1. Link the project:
@@ -97,7 +127,7 @@ Anonymous/public users can:
 
 Anonymous/public users should not be able to list requests, read owner notes, list request files, browse private STL storage, modify materials, modify gallery records, manage family members, or directly manage quotes.
 
-Owner/admin users are checked through active `owner_members` rows and can manage dashboard data through RLS-protected tables.
+Owner/admin users are checked through active `owner_members` rows and can manage dashboard data through RLS-protected tables. The local owner unlock is a trusted-network development fallback only; it should not be treated as a public production authentication replacement.
 
 Remaining security work before production:
 
