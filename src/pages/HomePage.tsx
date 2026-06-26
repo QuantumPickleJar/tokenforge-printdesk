@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import "./HomePage.css";
 
-const GENERATOR_URL = "https://github.com/QuantumPickleJar/tokenforge-generator";
+const GENERATOR_URL = "https://quantumpicklejar.github.io/tokenforge-generator/";
 
 export function HomePage() {
   return (
